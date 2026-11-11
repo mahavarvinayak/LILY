@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/daily-digest?type=drop",
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/daily-digest?type=nudge",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/daily-digest?type=wrap",
+      "schedule": "30 12 * * *"
+    }
+  ]
+}

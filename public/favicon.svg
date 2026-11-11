@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <defs>
+    <linearGradient id="lily-grad-center" x1="16" y1="2" x2="16" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#6C5CE7"/>
+    </linearGradient>
+    <linearGradient id="lily-grad-side" x1="6" y1="8" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <!-- Center Petal -->
+  <path d="M16 2.5C16 2.5 10.5 11.5 11 19.5C11.5 24 14.2 27.5 16 29C17.8 27.5 20.5 24 21 19.5C21.5 11.5 16 2.5 16 2.5Z" fill="url(#lily-grad-center)"/>
+  <!-- Left Petal -->
+  <path d="M4.5 11.5C4.5 11.5 5.5 21 13.8 26.2C11 23 8.5 18.5 6.5 14.5C5.7 12.8 4.5 11.5 4.5 11.5Z" fill="url(#lily-grad-side)" opacity="0.95"/>
+  <!-- Right Petal -->
+  <path d="M27.5 11.5C27.5 11.5 26.5 21 18.2 26.2C21 23 23.5 18.5 25.5 14.5C26.3 12.8 27.5 11.5 27.5 11.5Z" fill="url(#lily-grad-side)" opacity="0.95"/>
+  <!-- Central golden stamen glow -->
+  <circle cx="16" cy="18" r="1.5" fill="#FBBF24" opacity="0.8"/>
+</svg>
