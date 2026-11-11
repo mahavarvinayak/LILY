@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { Linkedin, Mail, Globe, ExternalLink, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -148,10 +149,12 @@ export function StatTile({
           <Icon className="size-4" aria-hidden />
         </span>
       </div>
-      <p className="mt-3 font-display text-[1.75rem] leading-none tabular-nums text-foreground">
+      <p className="mt-3 break-words font-display text-[1.75rem] leading-none tabular-nums text-foreground">
         {value}
       </p>
-      {hint ? <p className="mt-2 text-[11px] leading-4 text-muted-foreground">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-2 break-words text-[11px] leading-4 text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -182,9 +185,11 @@ export function SectionHeading({
             {eyebrow}
           </p>
         ) : null}
-        <h2 className="mt-0.5 font-display text-xl leading-tight text-foreground">{title}</h2>
+        <h2 className="mt-0.5 break-words font-display text-xl leading-tight text-foreground">
+          {title}
+        </h2>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
         {meta ? <div className="text-xs text-muted-foreground">{meta}</div> : null}
         {action}
       </div>
@@ -273,6 +278,55 @@ export function ChannelBadge({
   compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [tip, setTip] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearClose() {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function scheduleClose() {
+    clearClose();
+    closeTimer.current = setTimeout(() => setTip(null), 140);
+  }
+
+  function openTip() {
+    clearClose();
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    // 16rem panel, kept inside the viewport so it never gets cut at the edges.
+    const width = 256;
+    const margin = 8;
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2 - width / 2, margin),
+      Math.max(margin, window.innerWidth - width - margin),
+    );
+    const up = rect.top > 190;
+    setTip({ top: up ? rect.top - 8 : rect.bottom + 8, left, up });
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!tip) return;
+    // A viewport-anchored card can't follow a scroll, so dismiss it instead of
+    // letting it drift away from the badge it describes.
+    const dismiss = () => setTip(null);
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, [tip]);
 
   if (!value || !value.trim()) {
     return (
@@ -317,11 +371,18 @@ export function ChannelBadge({
   const Icon = kind === "linkedin" ? Linkedin : kind === "email" ? Mail : Globe;
 
   return (
-    <div className="group/chan relative inline-block">
+    <div
+      ref={anchorRef}
+      className="group/chan relative inline-block"
+      onMouseEnter={openTip}
+      onMouseLeave={scheduleClose}
+    >
       <a
         href={href}
         target={kind === "email" ? undefined : "_blank"}
         rel={kind === "email" ? undefined : "noopener noreferrer"}
+        onFocus={openTip}
+        onBlur={scheduleClose}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border font-mono text-[11px] font-medium transition-all shadow-sm",
           compact ? "px-2 py-1" : "px-2.5 py-1.5 max-w-[200px]",
@@ -333,36 +394,55 @@ export function ChannelBadge({
         {kind !== "email" && <ExternalLink className="size-2.5 shrink-0 opacity-60" />}
       </a>
 
-      <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-xl border border-border-strong bg-card p-3 shadow-2xl backdrop-blur-md opacity-0 transition-all duration-150 group-hover/chan:pointer-events-auto group-hover/chan:visible group-hover/chan:opacity-100">
-        <div className="flex items-center justify-between border-b border-border pb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
-            {kind === "linkedin" ? "LinkedIn Profile" : kind === "email" ? "Verified Email" : "Official Website"}
-          </span>
-          <span className="text-[10px] text-primary">Direct link</span>
-        </div>
-        <p className="mt-2 break-all font-mono text-[11px] leading-relaxed text-foreground">
-          {cleanVal}
-        </p>
-        <div className="mt-2.5 flex items-center justify-end gap-1.5 pt-1">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-surface px-2 text-[10px] font-medium text-foreground hover:bg-surface-elevated"
+      {tip &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            onMouseEnter={clearClose}
+            onMouseLeave={scheduleClose}
+            style={{
+              top: tip.top,
+              left: tip.left,
+              width: 256,
+              transform: tip.up ? "translateY(-100%)" : undefined,
+            }}
+            className="fixed z-[60] rounded-xl border border-border-strong bg-card p-3 shadow-2xl backdrop-blur-md"
           >
-            {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <a
-            href={href}
-            target={kind === "email" ? undefined : "_blank"}
-            rel={kind === "email" ? undefined : "noopener noreferrer"}
-            className="inline-flex h-6 items-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-2 text-[10px] font-medium text-primary hover:bg-primary/25"
-          >
-            {kind === "email" ? "Mailto" : "Open"}
-            <ExternalLink className="size-2.5" />
-          </a>
-        </div>
-      </div>
+            <div className="flex items-center justify-between gap-2 border-b border-border pb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
+                {kind === "linkedin"
+                  ? "LinkedIn Profile"
+                  : kind === "email"
+                    ? "Verified Email"
+                    : "Official Website"}
+              </span>
+              <span className="shrink-0 text-[10px] text-primary">Direct link</span>
+            </div>
+            <p className="mt-2 break-all font-mono text-[11px] leading-relaxed text-foreground">
+              {cleanVal}
+            </p>
+            <div className="mt-2.5 flex items-center justify-end gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-surface px-2 text-[10px] font-medium text-foreground hover:bg-surface-elevated"
+              >
+                {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <a
+                href={href}
+                target={kind === "email" ? undefined : "_blank"}
+                rel={kind === "email" ? undefined : "noopener noreferrer"}
+                className="inline-flex h-6 items-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-2 text-[10px] font-medium text-primary hover:bg-primary/25"
+              >
+                {kind === "email" ? "Mailto" : "Open"}
+                <ExternalLink className="size-2.5" />
+              </a>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

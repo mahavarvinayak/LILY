@@ -58,7 +58,7 @@ export function AgentBar() {
       {open ? (
         <section
           aria-label="LILY command console"
-          className="glass w-[min(36rem,calc(100vw-2rem))] rounded-3xl border border-primary/20 p-5 shadow-glow"
+          className="glass max-h-[calc(100dvh-2.5rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-3xl border border-primary/20 p-5 shadow-glow"
         >
           <div className="mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2 text-sm text-primary">
@@ -107,8 +107,10 @@ export function AgentBar() {
                 <div className="mt-3 space-y-2">
                   {result.drafts.slice(0, 3).map((d) => (
                     <div key={d.id} className="rounded-xl border border-border p-2">
-                      <p className="font-semibold text-primary">{d.subject}</p>
-                      <p className="line-clamp-2 text-[11px] text-muted-foreground">{d.body}</p>
+                      <p className="break-words font-semibold text-primary">{d.subject}</p>
+                      <p className="line-clamp-3 break-words text-[11px] leading-4 text-muted-foreground">
+                        {d.body}
+                      </p>
                     </div>
                   ))}
                 </div>

@@ -333,11 +333,11 @@ function DashboardShell({ children }: { children: ReactNode }) {
                 <div className="grid size-8 place-items-center rounded-full bg-primary/20 font-mono font-medium text-primary">
                   {initials(data.profile.agency_name)}
                 </div>
-                <div className="hidden leading-tight sm:block">
-                  <p className="font-medium text-foreground">
+                <div className="hidden min-w-0 max-w-[11rem] leading-tight sm:block">
+                  <p className="truncate font-medium text-foreground">
                     {data.profile.agency_name}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="truncate text-[11px] text-muted-foreground">
                     {nameFromEmail(data.profile.contact_email)}
                   </p>
                 </div>
@@ -359,7 +359,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           </DropdownMenu>
         </header>
 
-        <main className="p-4 md:p-8">{children}</main>
+        <main className="p-4 pb-24 md:p-8 md:pb-28">{children}</main>
         <MorningDropModal />
         <AgentBar />
       </div>
@@ -382,17 +382,17 @@ function DashboardShell({ children }: { children: ReactNode }) {
               />
             </div>
           </DialogHeader>
-          <div className="max-h-80 overflow-y-auto p-2">
+          <div className="max-h-[min(20rem,60dvh)] overflow-y-auto overscroll-contain p-2">
             {entries.length ? (
               entries.map((e, i) => (
                 <Link
                   key={i}
                   href={e.href}
                   onClick={() => setSearchOpen(false)}
-                  className="flex items-center justify-between rounded-xl px-3 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                  className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary transition-colors"
                 >
-                  <span>{e.label}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="min-w-0 truncate">{e.label}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">
                     {e.sub}
                   </span>
                 </Link>

@@ -216,7 +216,7 @@ export function ConnectorsPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <Header
           eyebrow="System · Connections"
           icon={Plug}
@@ -259,19 +259,19 @@ export function ConnectorsPage() {
             >
               <div>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border-strong bg-background">
                       {Logo ? <Logo /> : <Plug className="size-5 text-muted-foreground" />}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-foreground">{item.name}</h3>
+                        <h3 className="break-words font-semibold text-foreground">{item.name}</h3>
                         {item.comingSoon && <Pill tone="neutral">Coming soon</Pill>}
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.blurb}</p>
                       {isConnected && activeMailbox && (
-                        <p className="mt-2.5 inline-flex items-center gap-1.5 font-mono text-xs font-medium text-emerald-300">
-                          <span className="size-1.5 rounded-full bg-emerald-400" />
+                        <p className="mt-2.5 inline-flex max-w-full items-center gap-1.5 break-all font-mono text-xs font-medium text-emerald-300">
+                          <span className="size-1.5 shrink-0 rounded-full bg-emerald-400" />
                           {activeMailbox.email}
                         </p>
                       )}
@@ -411,7 +411,7 @@ export function ConnectorsPage() {
               </p>
             </div>
 
-            <div className="flex items-center justify-between gap-3 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
               <Button
                 variant="outline"
                 type="button"

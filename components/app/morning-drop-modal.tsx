@@ -90,10 +90,10 @@ export function MorningDropModal() {
                 <li key={item.id} className="flex items-start gap-2.5">
                   <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium text-foreground">
+                    <p className="break-words text-[13px] font-medium leading-5 text-foreground">
                       {item.company}
                     </p>
-                    <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 line-clamp-2 break-words text-[11px] leading-4 text-muted-foreground">
                       {item.trigger}
                     </p>
                   </div>

@@ -252,14 +252,14 @@ function OpportunitiesContent() {
                           name={o.company?.name || o.deal_name}
                           size={20}
                         />
-                        <p className="truncate text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
+                        <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
                           {o.company?.name || "Opportunity"}
                         </p>
                         <Pill tone={stageToneFor(o.stage)} className="ml-auto shrink-0">
                           {STAGE_META[o.stage].short}
                         </Pill>
                       </div>
-                      <h3 className="font-display text-lg leading-snug">{o.deal_name}</h3>
+                      <h3 className="break-words font-display text-lg leading-snug">{o.deal_name}</h3>
                       <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
                         {o.buying_trigger || "Your next conversation starts here."}
                       </p>
@@ -306,7 +306,7 @@ function OpportunitiesContent() {
       >
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle className="font-display text-3xl">
+            <SheetTitle className="break-words font-display text-3xl">
               {selected?.deal_name || "Opportunity unavailable"}
             </SheetTitle>
             <SheetDescription>{selected?.company?.name || "Lead dossier"}</SheetDescription>
@@ -353,10 +353,10 @@ function Dossier({
     <div className="mt-6 space-y-6">
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Building2 className="size-4 text-primary" />
-              <span className="font-semibold text-foreground">{intel.company_name}</span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Building2 className="size-4 shrink-0 text-primary" />
+              <span className="break-words font-semibold text-foreground">{intel.company_name}</span>
               <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
                 {intel.verification_status}
               </span>
@@ -395,17 +395,27 @@ function Dossier({
       </div>
 
       <Tabs defaultValue="trigger" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 text-xs">
-          <TabsTrigger value="trigger">Trigger</TabsTrigger>
-          <TabsTrigger value="contact">Contact</TabsTrigger>
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="outreach">Outreach</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
+        <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 text-xs">
+          <TabsTrigger value="trigger" className="min-w-fit flex-1 px-2.5">
+            Trigger
+          </TabsTrigger>
+          <TabsTrigger value="contact" className="min-w-fit flex-1 px-2.5">
+            Contact
+          </TabsTrigger>
+          <TabsTrigger value="company" className="min-w-fit flex-1 px-2.5">
+            Company
+          </TabsTrigger>
+          <TabsTrigger value="outreach" className="min-w-fit flex-1 px-2.5">
+            Outreach
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="min-w-fit flex-1 px-2.5">
+            Audit
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="trigger" className="space-y-4 pt-4">
           <Panel>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
               Buying Signal & Urgency
             </span>
@@ -448,7 +458,7 @@ function Dossier({
 
       <TabsContent value="contact" className="space-y-4 pt-4">
         <Panel>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
               Primary Decision Maker
             </span>
@@ -475,13 +485,15 @@ function Dossier({
             </div>
             <div className="sm:col-span-2">
               <p className="text-xs text-muted-foreground">Work Email Address</p>
-              <div className="mt-1 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-1.5">
-                <span className="text-xs font-mono text-foreground">{intel.work_email || "Email pending audit"}</span>
+              <div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-1.5">
+                <span className="min-w-0 break-all font-mono text-xs text-foreground">
+                  {intel.work_email || "Email pending audit"}
+                </span>
                 {intel.work_email && (
                   <button
                     type="button"
                     onClick={() => copyText("contact_email", intel.work_email)}
-                    className="text-xs text-primary hover:underline"
+                    className="shrink-0 text-xs text-primary hover:underline"
                   >
                     {copiedField === "contact_email" ? "Copied" : "Copy"}
                   </button>
@@ -493,7 +505,7 @@ function Dossier({
 
         {intel.secondary_contact_name && (
           <Panel>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
                 Secondary Decision Maker
               </span>
@@ -528,7 +540,7 @@ function Dossier({
 
         {intel.tertiary_contact_name && (
           <Panel>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
                 Tertiary Decision Maker
               </span>
@@ -684,13 +696,15 @@ function Dossier({
             Verification & Attribution
           </span>
           <div className="mt-3 space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Audit Tag:</span>
-              <span className="font-medium text-emerald-400">{intel.verification_status}</span>
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 text-muted-foreground">Audit Tag:</span>
+              <span className="break-words text-right font-medium text-emerald-400">
+                {intel.verification_status}
+              </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Source Attribution:</span>
-              <span className="font-mono text-muted-foreground truncate max-w-[240px]">
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 text-muted-foreground">Source Attribution:</span>
+              <span className="min-w-0 break-all text-right font-mono text-muted-foreground">
                 {intel.source_attribution}
               </span>
             </div>

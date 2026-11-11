@@ -353,30 +353,35 @@ export default function OutreachStudioPage() {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="truncate text-[13px] font-semibold text-foreground">
+                            <p className="min-w-0 truncate text-[13px] font-semibold text-foreground">
                               {intel.company_name}
                             </p>
                             {isDispatched ? (
-                              <Pill tone="emerald">
+                              <Pill tone="emerald" className="shrink-0">
                                 <CheckCircle2 className="size-3" />
                                 Sent
                               </Pill>
                             ) : (
-                              <Pill tone="primary">Ready</Pill>
+                              <Pill tone="primary" className="shrink-0">
+                                Ready
+                              </Pill>
                             )}
                           </div>
-                          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          <p className="mt-0.5 line-clamp-2 break-words text-[11px] leading-4 text-muted-foreground">
                             {intel.contact_name} · {intel.contact_title}
                           </p>
                         </div>
                       </div>
                       {intel.buying_trigger && (
-                        <p className="mt-2 line-clamp-1 text-[11px] text-primary/90">
+                        <p
+                          title={intel.buying_trigger}
+                          className="mt-2 line-clamp-2 break-words text-[11px] leading-4 text-primary/90"
+                        >
                           {intel.buying_trigger}
                         </p>
                       )}
                       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
-                        <span className="truncate font-mono">{intel.work_email}</span>
+                        <span className="min-w-0 truncate font-mono">{intel.work_email}</span>
                         <span className="shrink-0">{intel.trigger_age || "Active signal"}</span>
                       </div>
                     </button>
@@ -390,16 +395,16 @@ export default function OutreachStudioPage() {
             {activeItem ? (
               <Panel variant="flush">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
-                  <div className="flex items-start gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
                     <CompanyFavicon
                       domain={activeItem.opp.company?.domain}
                       website={activeItem.opp.company?.website}
                       name={activeItem.intel.company_name}
                       size={40}
                     />
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="font-display text-xl leading-tight text-foreground">
+                        <h2 className="break-words font-display text-xl leading-tight text-foreground">
                           {activeItem.intel.contact_name}
                         </h2>
                         <Pill tone="emerald" dot>
@@ -419,9 +424,9 @@ export default function OutreachStudioPage() {
                         </span>
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                          <Mail className="size-3" />
-                          {activeItem.intel.work_email}
+                        <span className="inline-flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                          <Mail className="size-3 shrink-0" />
+                          <span className="break-all">{activeItem.intel.work_email}</span>
                         </span>
                         {activeItem.intel.linkedin_url && (
                           <a
@@ -526,9 +531,9 @@ export default function OutreachStudioPage() {
                   </div>
 
                   {activeMailbox ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300">
+                    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300">
                       <ShieldCheck className="size-4 shrink-0 text-emerald-400" />
-                      <span>
+                      <span className="min-w-0 break-words">
                         Sending from your connected agency mailbox:{" "}
                         <strong className="font-mono text-foreground">{activeMailbox.email}</strong>{" "}
                         ({activeMailbox.appName})

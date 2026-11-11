@@ -156,7 +156,9 @@ export function AiAssistantView() {
                     <span className="font-mono text-xs font-semibold text-primary">{skill.command}</span>
                     <span className="text-xs font-medium text-foreground">{skill.name}</span>
                   </div>
-                  <p className="truncate text-[11px] text-muted-foreground">{skill.description}</p>
+                  <p className="line-clamp-2 break-words text-[11px] leading-4 text-muted-foreground">
+                    {skill.description}
+                  </p>
                 </div>
                 <span className="shrink-0 rounded-md border border-border bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
                   {skill.badge}
@@ -236,7 +238,7 @@ export function AiAssistantView() {
         <div className="mb-6 grid size-16 animate-pulse-soft place-items-center rounded-full border border-primary/20 bg-primary/10 shadow-glow">
           <LilyMark className="size-8 text-primary" />
         </div>
-        <h1 className="font-display text-4xl sm:text-5xl">
+        <h1 className="break-words font-display text-4xl sm:text-5xl">
           {greet},{" "}
           <em className="text-primary not-italic">
             {nameFromEmail(workspace.profile.contact_email) ||
@@ -287,7 +289,7 @@ export function AiAssistantView() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs font-medium text-foreground">{skill.name}</p>
-                <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 break-words text-[11px] leading-4 text-muted-foreground">
                   {skill.description}
                 </p>
               </button>
@@ -306,8 +308,8 @@ export function AiAssistantView() {
             key={index}
             className={
               message.role === "user"
-                ? "ml-auto max-w-[85%] rounded-3xl rounded-br-md border border-primary/20 bg-primary/10 p-5 text-sm leading-7"
-                : "glass mr-auto max-w-[95%] rounded-3xl rounded-bl-md border border-border p-6 text-sm leading-7"
+                ? "ml-auto max-w-[85%] break-words rounded-3xl rounded-br-md border border-primary/20 bg-primary/10 p-5 text-sm leading-7"
+                : "glass mr-auto max-w-[95%] break-words rounded-3xl rounded-bl-md border border-border p-6 text-sm leading-7"
             }
           >
             <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">

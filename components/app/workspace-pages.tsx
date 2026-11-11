@@ -208,7 +208,9 @@ export function HomePage() {
                   key={t.id}
                   className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/50 px-3.5 py-3"
                 >
-                  <span className="text-[13px] leading-5 text-foreground">{t.title}</span>
+                  <span className="min-w-0 flex-1 break-words text-[13px] leading-5 text-foreground">
+                    {t.title}
+                  </span>
                   <PriorityPill priority={t.priority} />
                 </div>
               ))
@@ -247,8 +249,10 @@ export function HomePage() {
                         {formatInr(o.deal_value, true)}
                       </span>
                     </div>
-                    <h3 className="my-2.5 font-display text-xl leading-snug">{o.deal_name}</h3>
-                    <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    <h3 className="my-2.5 break-words font-display text-xl leading-snug">
+                      {o.deal_name}
+                    </h3>
+                    <p className="line-clamp-2 break-words text-xs leading-5 text-muted-foreground">
                       {o.company?.name || "Independent opportunity"}
                       {o.buying_trigger ? ` · ${o.buying_trigger}` : ""}
                     </p>
@@ -526,7 +530,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                               <button
                                 type="button"
                                 onClick={() => setInspectId(c.id)}
-                                className="text-left text-sm font-semibold leading-5 text-foreground hover:text-primary hover:underline truncate block"
+                                className="block break-words text-left text-sm font-semibold leading-5 text-foreground hover:text-primary hover:underline"
                               >
                                 {c.name}
                               </button>
@@ -540,29 +544,32 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           <ChannelBadge kind="linkedin" value={c.linkedin_url} label="Company page" />
                         </td>
                         <td className={tableClasses.td}>
-                          <div className="inline-flex items-center gap-1.5 text-xs text-foreground whitespace-nowrap">
-                            <MapPin className="size-3 text-muted-foreground shrink-0" />
-                            {c.location || "—"}
+                          <div className="inline-flex items-start gap-1.5 text-xs text-foreground">
+                            <MapPin className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 break-words">{c.location || "—"}</span>
                           </div>
                         </td>
                         <td className={tableClasses.td}>
                           {c.industry ? (
                             <Pill tone="violet">{c.industry}</Pill>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className={tableClasses.td}>
                           {c.employee_count ? (
                             <Pill tone="neutral">{c.employee_count}</Pill>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className={tableClasses.td}>
                           {c.intel?.buying_trigger ? (
-                            <div className="space-y-1.5 min-w-[260px] max-w-[320px]">
-                              <p className="line-clamp-2 text-xs font-medium leading-relaxed text-foreground">
+                            <div className="min-w-[260px] max-w-[320px] space-y-1.5">
+                              <p
+                                title={c.intel.buying_trigger}
+                                className="line-clamp-2 break-words text-xs font-medium leading-relaxed text-foreground"
+                              >
                                 {c.intel.buying_trigger}
                               </p>
                               <div className="flex flex-wrap items-center gap-1.5">
@@ -585,11 +592,11 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                             <div className="space-y-1.5 min-w-[200px]">
                               <div className="flex items-center gap-1.5">
                                 <TierPill tier="primary" />
-                                <span className="text-xs font-semibold text-foreground truncate">
+                                <span className="min-w-0 break-words text-xs font-semibold text-foreground">
                                   {primaryContact.first_name} {primaryContact.last_name || ""}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-muted-foreground truncate">
+                              <p className="break-words text-[11px] text-muted-foreground">
                                 {primaryContact.job_title}
                               </p>
                               <div className="flex items-center gap-1.5">
@@ -608,11 +615,11 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                             <div className="space-y-1.5 min-w-[190px]">
                               <div className="flex items-center gap-1.5">
                                 <TierPill tier={secContact.role_tier} />
-                                <span className="text-xs font-semibold text-foreground truncate">
+                                <span className="min-w-0 break-words text-xs font-semibold text-foreground">
                                   {secContact.first_name} {secContact.last_name || ""}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-muted-foreground truncate">
+                              <p className="break-words text-[11px] text-muted-foreground">
                                 {secContact.job_title}
                               </p>
                               <div className="flex items-center gap-1.5">
@@ -630,10 +637,13 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                             <div className="space-y-1 min-w-[150px]">
                               <Link
                                 href={`/dashboard/opportunities?lead=${c.opportunity.id}`}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline truncate max-w-[180px]"
+                                title={c.opportunity.deal_name}
+                                className="flex items-start gap-1 text-xs font-semibold text-primary hover:underline"
                               >
-                                {c.opportunity.deal_name}
-                                <ArrowUpRight className="size-3" />
+                                <span className="line-clamp-2 break-words">
+                                  {c.opportunity.deal_name}
+                                </span>
+                                <ArrowUpRight className="mt-0.5 size-3 shrink-0" />
                               </Link>
                               <p className="text-[11px] text-muted-foreground">
                                 {formatInr(c.opportunity.deal_value, true)} ·{" "}
@@ -643,7 +653,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                               </p>
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className={cn(tableClasses.td, "text-right")}>
@@ -712,7 +722,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           <button
                             type="button"
                             onClick={() => setInspectId(p.id)}
-                            className="text-left text-sm font-semibold leading-5 text-foreground hover:text-primary hover:underline truncate block"
+                            className="block break-words text-left text-sm font-semibold leading-5 text-foreground hover:text-primary hover:underline"
                           >
                             {p.name}
                           </button>
@@ -721,20 +731,20 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       </div>
                     </td>
                     <td className={tableClasses.td}>
-                      <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                      <span className="break-words text-xs font-medium text-foreground">
                         {p.title || "Executive"}
                       </span>
                     </td>
                     <td className={tableClasses.td}>
                       {p.company ? (
-                        <div className="flex items-center gap-2 min-w-[170px]">
+                        <div className="flex min-w-[170px] items-center gap-2">
                           <CompanyFavicon
                             domain={p.company.domain}
                             website={p.company.website}
                             name={p.company.name}
                             size={26}
                           />
-                          <span className="text-xs font-semibold text-foreground truncate">
+                          <span className="min-w-0 break-words text-xs font-semibold text-foreground">
                             {p.company.name}
                           </span>
                         </div>
@@ -754,15 +764,18 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       <ChannelBadge kind="email" value={p.email} label={p.email || undefined} />
                     </td>
                     <td className={tableClasses.td}>
-                      <div className="inline-flex items-center gap-1.5 text-xs text-foreground whitespace-nowrap">
-                        <MapPin className="size-3 text-muted-foreground shrink-0" />
-                        {p.company?.location || "—"}
+                      <div className="inline-flex items-start gap-1.5 text-xs text-foreground">
+                        <MapPin className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 break-words">{p.company?.location || "—"}</span>
                       </div>
                     </td>
                     <td className={tableClasses.td}>
                       {p.intel?.buying_trigger ? (
-                        <div className="space-y-1.5 min-w-[240px] max-w-[300px]">
-                          <p className="line-clamp-2 text-xs font-medium leading-relaxed text-foreground">
+                        <div className="min-w-[240px] max-w-[300px] space-y-1.5">
+                          <p
+                            title={p.intel.buying_trigger}
+                            className="line-clamp-2 break-words text-xs font-medium leading-relaxed text-foreground"
+                          >
                             {p.intel.buying_trigger}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -785,10 +798,13 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         <div className="space-y-1 min-w-[140px]">
                           <Link
                             href={`/dashboard/opportunities?lead=${p.opportunity.id}`}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline truncate max-w-[170px]"
+                            title={p.opportunity.deal_name}
+                            className="flex items-start gap-1 text-xs font-semibold text-primary hover:underline"
                           >
-                            {p.opportunity.deal_name}
-                            <ArrowUpRight className="size-3" />
+                            <span className="line-clamp-2 break-words">
+                              {p.opportunity.deal_name}
+                            </span>
+                            <ArrowUpRight className="mt-0.5 size-3 shrink-0" />
                           </Link>
                           <p className="text-[11px] text-muted-foreground">
                             {formatInr(p.opportunity.deal_value, true)} ·{" "}
@@ -798,7 +814,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           </p>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className={cn(tableClasses.td, "text-right")}>
@@ -884,12 +900,22 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
           {currentIntel ? (
             <div className="mt-6 space-y-6">
               <Tabs defaultValue="foundation" className="w-full">
-                <TabsList className="grid w-full grid-cols-5 text-xs">
-                  <TabsTrigger value="foundation">Foundation</TabsTrigger>
-                  <TabsTrigger value="leadership">Leadership</TabsTrigger>
-                  <TabsTrigger value="signals">Signals</TabsTrigger>
-                  <TabsTrigger value="tech">Tech Stack</TabsTrigger>
-                  <TabsTrigger value="outreach">Outreach</TabsTrigger>
+                <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 text-xs">
+                  <TabsTrigger value="foundation" className="min-w-fit flex-1 px-2.5">
+                    Foundation
+                  </TabsTrigger>
+                  <TabsTrigger value="leadership" className="min-w-fit flex-1 px-2.5">
+                    Leadership
+                  </TabsTrigger>
+                  <TabsTrigger value="signals" className="min-w-fit flex-1 px-2.5">
+                    Signals
+                  </TabsTrigger>
+                  <TabsTrigger value="tech" className="min-w-fit flex-1 px-2.5">
+                    Tech Stack
+                  </TabsTrigger>
+                  <TabsTrigger value="outreach" className="min-w-fit flex-1 px-2.5">
+                    Outreach
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="foundation" className="space-y-4 pt-4">
@@ -901,28 +927,28 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       </span>
                     </div>
                     <div className="mt-4 space-y-3 text-sm">
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">01. Company Name</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">01. Company Name</span>
                         <span className="font-medium text-foreground">{currentIntel.company_name}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">02. Domain / Website</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">02. Domain / Website</span>
                         {currentIntel.website ? (
                           <a
                             href={currentIntel.website}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-primary hover:underline"
+                            className="flex min-w-0 items-center gap-1 break-all text-right text-primary hover:underline"
                           >
                             {currentIntel.website}
-                            <ExternalLink className="size-3" />
+                            <ExternalLink className="size-3 shrink-0" />
                           </a>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">03. Company LinkedIn</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">03. Company LinkedIn</span>
                         {currentIntel.company_linkedin_url ? (
                           <a
                             href={currentIntel.company_linkedin_url}
@@ -937,20 +963,20 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">04. Headquarters</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">04. Headquarters</span>
                         <span className="text-foreground">{currentIntel.headquarters || "—"}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">05. Employee Headcount</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">05. Employee Headcount</span>
                         <span className="font-mono text-foreground">{currentIntel.employee_count || "—"}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">06. Industry Niche</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">06. Industry Niche</span>
                         <span className="text-foreground">{currentIntel.industry_niche || "—"}</span>
                       </div>
                       <div className="pt-1">
-                        <span className="text-xs text-muted-foreground">07. Value Proposition</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">07. Value Proposition</span>
                         <p className="mt-1.5 text-xs leading-relaxed text-foreground">
                           {currentIntel.value_proposition || "—"}
                         </p>
@@ -970,16 +996,16 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       </span>
                     </div>
                     <div className="mt-4 space-y-3 text-sm">
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">08. Contact Name</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">08. Contact Name</span>
                         <span className="font-semibold text-foreground">{currentIntel.contact_name}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">09. Job Title</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">09. Job Title</span>
                         <span className="text-foreground">{currentIntel.job_title}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">10. Personal LinkedIn</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">10. Personal LinkedIn</span>
                         {currentIntel.linkedin_url ? (
                           <a
                             href={currentIntel.linkedin_url}
@@ -994,19 +1020,21 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">11. Tenure at Company</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">11. Tenure at Company</span>
                         <span className="text-foreground">{currentIntel.tenure_at_company || "—"}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">12. Follower Count</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">12. Follower Count</span>
                         <span className="font-mono text-foreground">{currentIntel.follower_count || "—"}</span>
                       </div>
-                      <div className="flex justify-between pt-1">
-                        <span className="text-xs text-muted-foreground">13. Corporate Work Email</span>
+                      <div className="flex items-start justify-between gap-3 pt-1 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">13. Corporate Work Email</span>
                         {currentIntel.work_email ? (
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-primary">{currentIntel.work_email}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="break-all text-right font-mono text-primary">
+                              {currentIntel.work_email}
+                            </span>
                             <button
                               type="button"
                               onClick={() => copyText("dossier-email", currentIntel.work_email)}
@@ -1037,16 +1065,16 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </div>
                     {currentIntel.secondary_contact_name ? (
                       <div className="mt-4 space-y-3 text-sm">
-                        <div className="flex justify-between border-b border-border pb-2">
-                          <span className="text-xs text-muted-foreground">14. Contact Name</span>
+                        <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                          <span className="shrink-0 text-xs text-muted-foreground">14. Contact Name</span>
                           <span className="font-semibold text-foreground">{currentIntel.secondary_contact_name}</span>
                         </div>
-                        <div className="flex justify-between border-b border-border pb-2">
-                          <span className="text-xs text-muted-foreground">15. Designation</span>
+                        <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                          <span className="shrink-0 text-xs text-muted-foreground">15. Designation</span>
                           <span className="text-foreground">{currentIntel.secondary_contact_title || "Executive"}</span>
                         </div>
-                        <div className="flex justify-between pt-1">
-                          <span className="text-xs text-muted-foreground">16. Personal LinkedIn</span>
+                        <div className="flex items-start justify-between gap-3 pt-1 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                          <span className="shrink-0 text-xs text-muted-foreground">16. Personal LinkedIn</span>
                           {currentIntel.secondary_linkedin_url ? (
                             <a
                               href={currentIntel.secondary_linkedin_url}
@@ -1080,16 +1108,16 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </div>
                     {currentIntel.tertiary_contact_name ? (
                       <div className="mt-4 space-y-3 text-sm">
-                        <div className="flex justify-between border-b border-border pb-2">
-                          <span className="text-xs text-muted-foreground">17. Contact Name</span>
+                        <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                          <span className="shrink-0 text-xs text-muted-foreground">17. Contact Name</span>
                           <span className="font-semibold text-foreground">{currentIntel.tertiary_contact_name}</span>
                         </div>
-                        <div className="flex justify-between border-b border-border pb-2">
-                          <span className="text-xs text-muted-foreground">18. Designation</span>
+                        <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                          <span className="shrink-0 text-xs text-muted-foreground">18. Designation</span>
                           <span className="text-foreground">{currentIntel.tertiary_contact_title || "Technical Lead"}</span>
                         </div>
-                        <div className="flex justify-between pt-1">
-                          <span className="text-xs text-muted-foreground">19. Personal LinkedIn</span>
+                        <div className="flex items-start justify-between gap-3 pt-1 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                          <span className="shrink-0 text-xs text-muted-foreground">19. Personal LinkedIn</span>
                           {currentIntel.tertiary_linkedin_url ? (
                             <a
                               href={currentIntel.tertiary_linkedin_url}
@@ -1119,21 +1147,21 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                         Commercial Urgency & Buying Signals
                       </span>
-                      <span className="text-xs text-muted-foreground">{currentIntel.trigger_age}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{currentIntel.trigger_age}</span>
                     </div>
                     <div className="mt-4 space-y-3 text-sm">
                       <div>
-                        <span className="text-xs text-muted-foreground">20. Buying Trigger</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">20. Buying Trigger</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.buying_trigger}
                         </p>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">21. Trigger Age / Timestamp</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">21. Trigger Age / Timestamp</span>
                         <span className="font-mono text-foreground">{currentIntel.trigger_age || "Active"}</span>
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">22. Proof Link</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">22. Proof Link</span>
                         {currentIntel.trigger_url ? (
                           <a
                             href={currentIntel.trigger_url}
@@ -1148,14 +1176,14 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </div>
-                      <div className="flex justify-between border-b border-border pb-2">
-                        <span className="text-xs text-muted-foreground">23. Intent Level</span>
+                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
+                        <span className="shrink-0 text-xs text-muted-foreground">23. Intent Level</span>
                         <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
                           {currentIntel.intent_level}
                         </span>
                       </div>
                       <div className="pt-1">
-                        <span className="text-xs text-muted-foreground">24. Recent Company News / Expansion</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">24. Recent Company News / Expansion</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.recent_company_news || "—"}
                         </p>
@@ -1180,7 +1208,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">—</span>
                       )}
                     </div>
                   </Panel>
@@ -1200,7 +1228,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-muted-foreground">Standard requirements</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Standard requirements</span>
                       )}
                     </div>
                   </Panel>
@@ -1213,31 +1241,31 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </span>
                     <div className="mt-4 space-y-3 text-sm">
                       <div>
-                        <span className="text-xs text-muted-foreground">27. Recent Founder Post Context</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">27. Recent Founder Post Context</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.recent_founder_activity || "—"}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="text-xs text-muted-foreground">28. High-Conversion Subject Line</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">28. High-Conversion Subject Line</span>
                         <p className="mt-1 font-mono text-xs text-foreground">
                           {currentIntel.email_subject_line}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="text-xs text-muted-foreground">29. AI Icebreaker Hook</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">29. AI Icebreaker Hook</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.ai_icebreaker}
                         </p>
                       </div>
                       <div className="flex justify-between border-t border-border pt-3">
-                        <span className="text-xs text-muted-foreground">30. Verification Integrity</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">30. Verification Integrity</span>
                         <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
                           {currentIntel.verification_status}
                         </span>
                       </div>
                       <div className="flex justify-between border-t border-border pt-3">
-                        <span className="text-xs text-muted-foreground">31. Source Attribution</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">31. Source Attribution</span>
                         {currentIntel.source_attribution ? (
                           <a
                             href={currentIntel.source_attribution}
@@ -1415,16 +1443,16 @@ export function TeamPage() {
           {d.team_members.map((m) => (
             <Panel key={m.id}>
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded-full border border-primary/25 bg-primary/10 font-mono text-sm font-semibold text-primary">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 font-mono text-sm font-semibold text-primary">
                     {initials(m.name) || "T"}
                   </div>
-                  <div>
-                    <h2 className="font-display text-xl leading-tight">{m.name}</h2>
+                  <div className="min-w-0">
+                    <h2 className="break-words font-display text-xl leading-tight">{m.name}</h2>
                     <p className="mt-0.5 break-all text-xs text-muted-foreground">{m.email}</p>
                   </div>
                 </div>
-                <Pill tone={m.status === "Active" ? "emerald" : "amber"} dot>
+                <Pill tone={m.status === "Active" ? "emerald" : "amber"} dot className="shrink-0">
                   {m.status}
                 </Pill>
               </div>
@@ -1512,8 +1540,8 @@ export function SettingsPage() {
                 return (
                   <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                     <input type="hidden" name="target_niche" value={d.profile.target_niche || ""} />
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                         Active ICP Configuration
                       </span>
                       <Link
@@ -1523,30 +1551,30 @@ export function SettingsPage() {
                         Edit Parameters <ArrowUpRight className="size-3" />
                       </Link>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
                       <div>
                         <span className="text-muted-foreground block text-[10px]">Offer:</span>
-                        <span className="font-medium text-foreground line-clamp-1">{icp.service_offer}</span>
+                        <span className="line-clamp-2 break-words font-medium text-foreground">{icp.service_offer}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-[10px]">Geography:</span>
-                        <span className="font-medium text-foreground line-clamp-1">{icp.target_geography}</span>
+                        <span className="line-clamp-2 break-words font-medium text-foreground">{icp.target_geography}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-[10px]">Niche:</span>
-                        <span className="font-medium text-foreground line-clamp-1">{icp.target_industry}</span>
+                        <span className="line-clamp-2 break-words font-medium text-foreground">{icp.target_industry}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-[10px]">Headcount:</span>
-                        <span className="font-medium text-foreground line-clamp-1">{icp.company_size}</span>
+                        <span className="line-clamp-2 break-words font-medium text-foreground">{icp.company_size}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-[10px]">Decision Makers:</span>
-                        <span className="font-medium text-foreground line-clamp-1">{icp.decision_makers}</span>
+                        <span className="line-clamp-2 break-words font-medium text-foreground">{icp.decision_makers}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-[10px]">Trigger:</span>
-                        <span className="font-medium text-foreground line-clamp-1">{icp.buying_trigger}</span>
+                        <span className="line-clamp-2 break-words font-medium text-foreground">{icp.buying_trigger}</span>
                       </div>
                     </div>
                   </div>
@@ -1555,14 +1583,14 @@ export function SettingsPage() {
               return (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
                   <input type="hidden" name="target_niche" value={d.profile.target_niche || ""} />
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold text-amber-400">ICP Profile Pending</p>
                       <p className="text-[11px] text-muted-foreground">Complete your 7-question profile to activate morning lead drops.</p>
                     </div>
                     <Link
                       href="/onboarding"
-                      className="rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/30"
+                      className="shrink-0 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/30"
                     >
                       Calibrate ICP →
                     </Link>
@@ -1576,7 +1604,7 @@ export function SettingsPage() {
               type="url"
               defaultValue={d.profile.slack_webhook_url || ""}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="shrink-0 text-xs text-muted-foreground">
               Use https://hooks.slack.com/services/… to configure your drop digest destination.
             </p>
             <Button type="submit" disabled={save.isPending}>
