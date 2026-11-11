@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ShieldCheck,
   Mail,
+  AlertCircle,
 } from "lucide-react";
 import {
   Header,
@@ -37,11 +38,13 @@ export default function OutreachStudioPage() {
   const d = useWorkspace();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [filterTab, setFilterTab] = useState<"all" | "has-email" | "ready" | "dispatched">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [isDraftingAll, setIsDraftingAll] = useState(false);
+  const [isDraftingSingle, setIsDraftingSingle] = useState(false);
 
   const saveDraft = useWrite(api.updateDraft, "Outreach pitch saved");
 
@@ -64,18 +67,27 @@ export default function OutreachStudioPage() {
 
   const activeMailbox = mailboxData?.mailboxes?.find((m) => m.status === "active");
 
-  const verifiedLeads = d.opportunities
-    .map((opp) => {
-      const intel = extractLeadIntelligence(opp, opp.company, opp.person);
-      return {
-        opp,
-        intel,
-        hasEmail: Boolean(intel.work_email && intel.work_email.includes("@")),
-      };
-    })
-    .filter((item) => item.hasEmail);
+  const allQueueLeads = d.opportunities.map((opp) => {
+    const intel = extractLeadIntelligence(opp, opp.company, opp.person);
+    return {
+      opp,
+      intel,
+      hasEmail: Boolean(intel.work_email && intel.work_email.includes("@")),
+    };
+  });
 
-  const filteredLeads = verifiedLeads.filter(
+  const verifiedLeads = allQueueLeads.filter((item) => item.hasEmail);
+  const dispatchedLeads = allQueueLeads.filter((item) => item.opp.outreach_dispatched);
+  const readyLeads = allQueueLeads.filter((item) => item.hasEmail && !item.opp.outreach_dispatched);
+
+  const tabFilteredLeads = allQueueLeads.filter((item) => {
+    if (filterTab === "has-email") return item.hasEmail;
+    if (filterTab === "ready") return item.hasEmail && !item.opp.outreach_dispatched;
+    if (filterTab === "dispatched") return item.opp.outreach_dispatched;
+    return true;
+  });
+
+  const filteredLeads = tabFilteredLeads.filter(
     ({ intel }) =>
       `${intel.company_name} ${intel.contact_name} ${intel.work_email} ${intel.buying_trigger}`
         .toLowerCase()
@@ -84,17 +96,21 @@ export default function OutreachStudioPage() {
 
   const activeItem =
     filteredLeads.find((item) => item.opp.id === selectedId) ||
+    allQueueLeads.find((item) => item.opp.id === selectedId) ||
     filteredLeads[0] ||
+    allQueueLeads[0] ||
     null;
 
   const [customSubject, setCustomSubject] = useState("");
   const [customBody, setCustomBody] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [editingOppId, setEditingOppId] = useState<string | null>(null);
 
   if (activeItem && editingOppId !== activeItem.opp.id) {
     setEditingOppId(activeItem.opp.id);
     setCustomSubject(activeItem.opp.ai_subject_line || activeItem.intel.email_subject_line);
     setCustomBody(activeItem.opp.ai_icebreaker || activeItem.intel.ai_icebreaker);
+    setRecipientEmail(activeItem.intel.work_email || "");
   }
 
   function copyText(key: string, val: string) {
@@ -105,8 +121,37 @@ export default function OutreachStudioPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   }
 
+  async function handleDraftSingleWithAi(companyName: string) {
+    if (!companyName) return;
+    setIsDraftingSingle(true);
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: `/draft ${companyName}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || "AI drafting failed.");
+      }
+      toast.success(data.message || `Drafted pitch for ${companyName}.`);
+      await qc.invalidateQueries({ queryKey: workspaceKey });
+      if (Array.isArray(data.drafts) && data.drafts.length > 0) {
+        setCustomSubject(data.drafts[0].subject);
+        setCustomBody(data.drafts[0].body);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "AI drafting failed.");
+    } finally {
+      setIsDraftingSingle(false);
+    }
+  }
+
   async function handleSendSingle(oppId: string, to: string, subject: string, body: string) {
-    if (!to || !to.includes("@")) {
+    const cleanTo = to.trim();
+    if (!cleanTo || !cleanTo.includes("@")) {
       toast.error("Valid recipient email is required.");
       return;
     }
@@ -117,7 +162,7 @@ export default function OutreachStudioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           opportunityId: oppId,
-          to,
+          to: cleanTo,
           subject,
           body,
         }),
@@ -128,7 +173,7 @@ export default function OutreachStudioPage() {
         throw new Error(data.error || "Failed to dispatch email.");
       }
 
-      toast.success(`Outreach dispatched directly to ${to}.`);
+      toast.success(`Outreach dispatched directly to ${cleanTo}.`);
       await qc.invalidateQueries({ queryKey: workspaceKey });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Outreach failed.");
@@ -138,9 +183,9 @@ export default function OutreachStudioPage() {
   }
 
   async function handleBatchSend() {
-    const queue = verifiedLeads.filter((item) => !item.opp.outreach_dispatched);
+    const queue = readyLeads;
     if (!queue.length) {
-      toast.info("All verified leads already dispatched.");
+      toast.info("No leads with verified email awaiting dispatch.");
       return;
     }
 
@@ -184,14 +229,14 @@ export default function OutreachStudioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Generate tailored outreach pitch drafts for all uncontacted leads.",
+          input: "/draft-all",
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         throw new Error(data.message || "AI drafting failed.");
       }
-      toast.success("AI generated bespoke drafts for all verified leads.");
+      toast.success(data.message || "AI generated bespoke drafts for all leads.");
       await qc.invalidateQueries({ queryKey: workspaceKey });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "AI drafting failed.");
@@ -200,12 +245,10 @@ export default function OutreachStudioPage() {
     }
   }
 
-  const dispatchedCount = verifiedLeads.filter((item) => item.opp.outreach_dispatched).length;
-  const readyCount = verifiedLeads.filter((item) => !item.opp.outreach_dispatched).length;
-  const queueValue = verifiedLeads.reduce((sum, item) => sum + item.opp.deal_value, 0);
-  const dispatchedPct = verifiedLeads.length
-    ? Math.round((dispatchedCount / verifiedLeads.length) * 100)
-    : 0;
+  const dispatchedCount = dispatchedLeads.length;
+  const readyCount = readyLeads.length;
+  const totalPipelineCount = allQueueLeads.length;
+  const queueValue = allQueueLeads.reduce((sum, item) => sum + item.opp.deal_value, 0);
 
   return (
     <>
@@ -214,7 +257,7 @@ export default function OutreachStudioPage() {
         icon={Send}
         tone="emerald"
         title="Outreach Studio"
-        description="Human-in-the-loop review and 1-click dispatch. Only verified corporate emails enter this queue."
+        description="Human-in-the-loop review and 1-click dispatch. Review pitches and send through your connected mailbox."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -222,14 +265,14 @@ export default function OutreachStudioPage() {
               size="sm"
               onClick={() => {
                 export31FieldsToCsv(
-                  verifiedLeads.map((item) => ({
+                  allQueueLeads.map((item) => ({
                     opp: item.opp,
                     company: item.opp.company,
                     person: item.opp.person,
                   })),
-                  "lily_verified_outreach_queue",
+                  "lily_pipeline_outreach_queue",
                 );
-                toast.success("Downloaded verified outreach queue CSV.");
+                toast.success("Downloaded pipeline outreach queue CSV.");
               }}
               className="gap-1.5 text-xs"
             >
@@ -238,7 +281,7 @@ export default function OutreachStudioPage() {
             </Button>
             <Button
               size="sm"
-              disabled={isBatchSending || readyCount === 0}
+              disabled={isBatchSending || readyCount === 0 || !activeMailbox}
               onClick={handleBatchSend}
               className="gap-1.5 text-xs"
             >
@@ -251,39 +294,39 @@ export default function OutreachStudioPage() {
 
       <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile
-          label="Verified prospects"
-          value={verifiedLeads.length}
-          hint="Corporate emails verified"
+          label="Pipeline prospects"
+          value={totalPipelineCount}
+          hint="Accounts ready for outreach"
           icon={ShieldCheck}
           tone="sky"
         />
         <StatTile
           label="Ready to send"
           value={readyCount}
-          hint="Awaiting your approval"
+          hint="Verified email awaiting send"
           icon={Send}
           tone="primary"
         />
         <StatTile
           label="Dispatched"
           value={dispatchedCount}
-          hint={`${dispatchedPct}% of the queue`}
+          hint={`${totalPipelineCount ? Math.round((dispatchedCount / totalPipelineCount) * 100) : 0}% of pipeline contacted`}
           icon={CheckCircle2}
           tone="emerald"
         />
         <StatTile
-          label="Queue value"
+          label="Pipeline value"
           value={formatInr(queueValue, true)}
-          hint="Verified pipeline in review"
+          hint="Total pipeline under review"
           icon={Download}
           tone="amber"
         />
       </div>
 
-      {!verifiedLeads.length ? (
+      {!allQueueLeads.length ? (
         <Empty
-          title="No verified emails in queue yet"
-          description="Leads with verified corporate emails will automatically populate here upon your morning drop."
+          title="No prospects in pipeline yet"
+          description="Accounts with verified commercial buying signals will automatically populate here upon your morning drop."
           action={
             <Link
               href="/dashboard/companies"
@@ -299,7 +342,7 @@ export default function OutreachStudioPage() {
             <Panel variant="flush">
               <SectionHeading
                 eyebrow="Prospect queue"
-                title="Verified decision makers"
+                title="Pipeline decision makers"
                 meta={`${filteredLeads.length} in view`}
                 action={
                   <Button
@@ -314,6 +357,56 @@ export default function OutreachStudioPage() {
                   </Button>
                 }
               />
+              <div className="flex items-center gap-1.5 overflow-x-auto border-b border-border p-2">
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("all")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                    filterTab === "all"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                  )}
+                >
+                  All ({allQueueLeads.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("has-email")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                    filterTab === "has-email"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                  )}
+                >
+                  With Email ({verifiedLeads.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("ready")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                    filterTab === "ready"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                  )}
+                >
+                  Ready ({readyLeads.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("dispatched")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                    filterTab === "dispatched"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                  )}
+                >
+                  Sent ({dispatchedLeads.length})
+                </button>
+              </div>
               <div className="border-b border-border p-3">
                 <Input
                   placeholder="Filter by company, name or email…"
@@ -325,10 +418,10 @@ export default function OutreachStudioPage() {
               <div className="max-h-[640px] space-y-2 overflow-y-auto p-3">
                 {!filteredLeads.length && (
                   <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs leading-5 text-muted-foreground">
-                    No verified prospects match “{q}”. Try a company name or email.
+                    No prospects match “{q}”. Try a company name or clear filters.
                   </div>
                 )}
-                {filteredLeads.map(({ opp, intel }) => {
+                {filteredLeads.map(({ opp, intel, hasEmail }) => {
                   const isSelected = activeItem?.opp.id === opp.id;
                   const isDispatched = opp.outreach_dispatched;
 
@@ -361,9 +454,13 @@ export default function OutreachStudioPage() {
                                 <CheckCircle2 className="size-3" />
                                 Sent
                               </Pill>
-                            ) : (
+                            ) : hasEmail ? (
                               <Pill tone="primary" className="shrink-0">
                                 Ready
+                              </Pill>
+                            ) : (
+                              <Pill tone="amber" className="shrink-0">
+                                Email needed
                               </Pill>
                             )}
                           </div>
@@ -381,7 +478,9 @@ export default function OutreachStudioPage() {
                         </p>
                       )}
                       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
-                        <span className="min-w-0 truncate font-mono">{intel.work_email}</span>
+                        <span className="min-w-0 truncate font-mono">
+                          {intel.work_email || "Email unlisted"}
+                        </span>
                         <span className="shrink-0">{intel.trigger_age || "Active signal"}</span>
                       </div>
                     </button>
@@ -407,9 +506,15 @@ export default function OutreachStudioPage() {
                         <h2 className="break-words font-display text-xl leading-tight text-foreground">
                           {activeItem.intel.contact_name}
                         </h2>
-                        <Pill tone="emerald" dot>
-                          Email verified
-                        </Pill>
+                        {recipientEmail && recipientEmail.includes("@") ? (
+                          <Pill tone="emerald" dot>
+                            Email ready
+                          </Pill>
+                        ) : (
+                          <Pill tone="amber" dot>
+                            Email needed to send
+                          </Pill>
+                        )}
                         {activeItem.opp.outreach_dispatched && (
                           <Pill tone="sky">
                             <CheckCircle2 className="size-3" />
@@ -424,10 +529,6 @@ export default function OutreachStudioPage() {
                         </span>
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <span className="inline-flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                          <Mail className="size-3 shrink-0" />
-                          <span className="break-all">{activeItem.intel.work_email}</span>
-                        </span>
                         {activeItem.intel.linkedin_url && (
                           <a
                             href={activeItem.intel.linkedin_url}
@@ -475,24 +576,66 @@ export default function OutreachStudioPage() {
                     )}
                   </div>
 
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <Label htmlFor="pitch-recipient" className="text-xs font-semibold text-foreground">
+                        Recipient Decision Maker Email
+                      </Label>
+                      <span className="text-[11px] text-muted-foreground">
+                        Direct destination inbox
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="pitch-recipient"
+                        type="email"
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        placeholder="e.g. founder@company.com"
+                        className="font-mono text-sm"
+                      />
+                      {recipientEmail && recipientEmail.includes("@") ? (
+                        <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
+                          <Check className="size-3" /> Ready
+                        </span>
+                      ) : (
+                        <span className="flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-400">
+                          <AlertCircle className="size-3" /> Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="space-y-4">
                     <div>
                       <div className="mb-1.5 flex items-center justify-between">
                         <Label htmlFor="pitch-subject" className="text-xs font-semibold text-foreground">
                           Subject line
                         </Label>
-                        <button
-                          type="button"
-                          onClick={() => copyText("pitch-subject", customSubject)}
-                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
-                        >
-                          {copiedKey === "pitch-subject" ? (
-                            <Check className="size-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                          Copy
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isDraftingSingle}
+                            onClick={() => handleDraftSingleWithAi(activeItem.intel.company_name)}
+                            className="h-6 gap-1 text-[11px] text-primary hover:text-primary"
+                          >
+                            <Sparkles className="size-3" />
+                            {isDraftingSingle ? "Drafting…" : "Regenerate angle with AI"}
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => copyText("pitch-subject", customSubject)}
+                            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                          >
+                            {copiedKey === "pitch-subject" ? (
+                              <Check className="size-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="size-3" />
+                            )}
+                            Copy
+                          </button>
+                        </div>
                       </div>
                       <Input
                         id="pitch-subject"
@@ -573,11 +716,11 @@ export default function OutreachStudioPage() {
                   </Button>
 
                   <Button
-                    disabled={isSending || !activeMailbox}
+                    disabled={isSending || !activeMailbox || !recipientEmail || !recipientEmail.includes("@")}
                     onClick={() =>
                       handleSendSingle(
                         activeItem.opp.id,
-                        activeItem.intel.work_email,
+                        recipientEmail,
                         customSubject,
                         customBody,
                       )

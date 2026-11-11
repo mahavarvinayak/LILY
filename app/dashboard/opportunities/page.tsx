@@ -341,6 +341,19 @@ function Dossier({
   const details = useWrite(api.updateOpportunity, "Deal updated");
   const del = useWrite(api.deleteOpportunity, "Deal deleted");
 
+  const isJsonNotes = Boolean(o.notes?.trim().startsWith("{") && o.notes?.trim().endsWith("}"));
+  let userNotes = "";
+  if (isJsonNotes) {
+    try {
+      const parsed = JSON.parse(o.notes || "{}");
+      userNotes = typeof parsed.user_notes === "string" ? parsed.user_notes : "";
+    } catch {
+      userNotes = "";
+    }
+  } else {
+    userNotes = o.notes || "";
+  }
+
   function copyText(key: string, text: string) {
     if (!text) return;
     void navigator.clipboard.writeText(text);
@@ -716,22 +729,34 @@ function Dossier({
             onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
+              const submittedText = String(f.get("notes") || "").trim();
+              let patchNotes = submittedText;
+              if (isJsonNotes) {
+                try {
+                  const parsed = JSON.parse(o.notes || "{}");
+                  parsed.user_notes = submittedText;
+                  patchNotes = JSON.stringify(parsed);
+                } catch {
+                  patchNotes = submittedText;
+                }
+              }
               await details.run({
                 id: o.id,
                 patch: {
-                  notes: String(f.get("notes") || ""),
+                  notes: patchNotes,
                   deal_value: Math.max(0, Number(f.get("value")) || 0),
                 },
               });
             }}
           >
             <Field name="value" label="Deal Value (INR)" type="number" defaultValue={o.deal_value} />
-            <Label htmlFor="notes">Raw Pipeline Notes / Payload</Label>
+            <Label htmlFor="notes">Executive Deal Notes</Label>
             <textarea
               id="notes"
               name="notes"
               rows={4}
-              defaultValue={o.notes || ""}
+              defaultValue={userNotes}
+              placeholder="Add strategic context, meeting takeaways, or next action items..."
               className={fieldClass}
             />
             <Button type="submit" size="sm" disabled={details.isPending}>

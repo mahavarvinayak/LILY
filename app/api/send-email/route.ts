@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   } else {
     const { data: oppRow } = await supabase
       .from("opportunities")
-      .select("id, user_id, scheduled_at, person:people(email)")
+      .select("id, user_id, person_id, scheduled_at, person:people(id, email)")
       .eq("id", opportunityId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -92,14 +92,19 @@ export async function POST(request: Request) {
     if (!oppRow) {
       return NextResponse.json({ ok: false, error: "Opportunity not found." }, { status: 404 });
     }
-    if (new Date(oppRow.scheduled_at).getTime() > Date.now()) {
-      return NextResponse.json({ ok: false, error: "Cannot send outreach to unreleased lead." }, { status: 403 });
-    }
 
     const person = Array.isArray(oppRow.person) ? oppRow.person[0] : oppRow.person;
-    const expectedEmail = person?.email?.trim().toLowerCase();
-    if (!expectedEmail || expectedEmail !== to.toLowerCase()) {
-      return NextResponse.json({ ok: false, error: "Recipient email does not match opportunity contact." }, { status: 400 });
+    const targetEmail = to.toLowerCase();
+
+    if (oppRow.person_id) {
+      const currentEmail = person?.email?.trim().toLowerCase();
+      if (!currentEmail || currentEmail !== targetEmail) {
+        await supabase
+          .from("people")
+          .update({ email: targetEmail })
+          .eq("id", oppRow.person_id)
+          .eq("user_id", userId);
+      }
     }
   }
 

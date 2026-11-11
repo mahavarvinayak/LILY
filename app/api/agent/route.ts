@@ -175,12 +175,33 @@ export async function POST(request: Request) {
   const isReengageCommand = command === "/re-engage-all" || /^\/re-?engage-all\b/i.test(input) || /^re-?engage\s+stalled/i.test(input);
 
   if (isDraftCommand) {
-    const newLeads = opportunities.filter((opportunity) => opportunity.stage === "New Lead").slice(0, quota);
-    if (newLeads.length === 0) {
+    const singleQuery = input
+      .replace(/^\/draft(-all)?\s*/i, "")
+      .replace(/^draft\s+(all|pitches|leads)?\s*/i, "")
+      .trim();
+
+    let leadsToDraft = opportunities.filter((opportunity) => !opportunity.outreach_dispatched);
+    if (!leadsToDraft.length) leadsToDraft = opportunities;
+
+    if (singleQuery && singleQuery.length > 1) {
+      const q = singleQuery.toLowerCase();
+      const matched = opportunities.find((o) =>
+        (o.company?.name || "").toLowerCase().includes(q) ||
+        (o.deal_name || "").toLowerCase().includes(q) ||
+        (o.person?.first_name || "").toLowerCase().includes(q),
+      );
+      if (matched) {
+        leadsToDraft = [matched];
+      }
+    } else {
+      leadsToDraft = leadsToDraft.slice(0, quota);
+    }
+
+    if (leadsToDraft.length === 0) {
       const result: AgentResult = {
         ok: true,
         command: "draft-all",
-        message: "Nothing new to draft. Today's drop is empty — the next quota unlocks at 08:00.",
+        message: "No opportunities found to draft in your pipeline.",
         updated: 0,
         demo: false,
       };
@@ -188,7 +209,7 @@ export async function POST(request: Request) {
     }
 
     const started = Date.now();
-    const drafts = await generateDrafts(newLeads.map(toDraftLead));
+    const drafts = await generateDrafts(leadsToDraft.map(toDraftLead));
 
     const updates = await Promise.allSettled(
       drafts.map((draft) =>
@@ -203,7 +224,7 @@ export async function POST(request: Request) {
     const result: AgentResult = {
       ok: true,
       command: "draft-all",
-      message: `Drafted ${successful} personalized pitches in ${((Date.now() - started) / 1000).toFixed(1)}s. They are loaded in each lead's Outreach Studio.`,
+      message: `Drafted ${successful} personalized pitch${successful === 1 ? "" : "es"} in ${((Date.now() - started) / 1000).toFixed(1)}s. Loaded in Outreach Studio.`,
       updated: successful,
       drafts,
       demo: false,
