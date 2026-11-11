@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -10,11 +11,13 @@ import {
   ExternalLink,
   Copy,
   Check,
+  Download,
 } from "lucide-react";
 import { api, useWorkspaceMutation } from "@/lib/workspace";
 import { STAGES, STAGE_META, type Stage, type OpportunityRecord } from "@/lib/types";
 import { formatInr, cn } from "@/lib/utils";
 import { extractLeadIntelligence } from "@/lib/intelligence";
+import { export31FieldsToCsv } from "@/lib/export-csv";
 import {
   Header,
   Panel,
@@ -84,13 +87,34 @@ function OpportunitiesContent() {
         description="From first signal to lasting partnership. Every meaningful conversation has a place."
         action={<CreateRecord kind="deal" />}
       />
-      <Input
-        className="mb-6 max-w-md"
-        aria-label="Search opportunities"
-        placeholder="Find a deal, company or signal…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Input
+          className="max-w-md"
+          aria-label="Search opportunities"
+          placeholder="Find a deal, company or signal…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            export31FieldsToCsv(
+              data.opportunities.map((opp) => ({
+                opp,
+                company: opp.company,
+                person: opp.person,
+              })),
+              "lily_pipeline_opportunities",
+            );
+            toast.success("Downloaded 31-field intelligence CSV.");
+          }}
+          className="gap-1.5"
+        >
+          <Download className="size-3.5" />
+          Export 31-Field CSV
+        </Button>
+      </div>
       {!data.opportunities.length && (
         <div className="mb-6">
           <Empty
@@ -300,222 +324,295 @@ function Dossier({
           <Panel>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                Buying Signal (Field 13)
-              </span>
-              <span className="text-xs text-muted-foreground">{intel.trigger_age}</span>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-foreground">{intel.buying_trigger}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-              <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                {intel.intent_level}
-              </span>
-              {intel.trigger_url && /^https?:\/\//i.test(intel.trigger_url) && (
-                <a
-                  href={intel.trigger_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  Source Requisition <ExternalLink className="size-3" />
-                </a>
-              )}
-            </div>
-          </Panel>
-
-          <Panel>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-              Required Engineering Stack (Field 19)
+              Buying Signal & Urgency
             </span>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {intel.required_engineering_stack.map((skill) => (
-                <span
-                  key={skill}
-                  className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs text-muted-foreground"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </Panel>
-        </TabsContent>
-
-        <TabsContent value="contact" className="space-y-4 pt-4">
-          <Panel>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-              Executive Dossier (Fields 7-12)
+            <span className="text-xs text-muted-foreground">{intel.trigger_age}</span>
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-foreground">{intel.buying_trigger}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+              {intel.intent_level}
             </span>
+            {intel.trigger_url && /^https?:\/\//i.test(intel.trigger_url) && (
+              <a
+                href={intel.trigger_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Source Requisition <ExternalLink className="size-3" />
+              </a>
+            )}
+          </div>
+        </Panel>
+
+        <Panel>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Required Engineering Stack
+          </span>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {intel.required_engineering_stack.map((skill) => (
+              <span
+                key={skill}
+                className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs text-muted-foreground"
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        </Panel>
+      </TabsContent>
+
+      <TabsContent value="contact" className="space-y-4 pt-4">
+        <Panel>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+              Primary Decision Maker
+            </span>
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+              Primary
+            </span>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Full Name</p>
+              <p className="text-sm font-medium text-foreground">{intel.contact_name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Job Designation</p>
+              <p className="text-sm font-medium text-foreground">{intel.contact_title}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Leadership Tenure</p>
+              <p className="text-sm text-foreground">{intel.tenure_at_company || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Follower Tier</p>
+              <p className="text-sm text-foreground">{intel.follower_count || "—"}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs text-muted-foreground">Work Email Address</p>
+              <div className="mt-1 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-1.5">
+                <span className="text-xs font-mono text-foreground">{intel.work_email || "Email pending audit"}</span>
+                {intel.work_email && (
+                  <button
+                    type="button"
+                    onClick={() => copyText("contact_email", intel.work_email)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {copiedField === "contact_email" ? "Copied" : "Copy"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        {intel.secondary_contact_name && (
+          <Panel>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
+                Secondary Decision Maker
+              </span>
+              <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-400">
+                Secondary
+              </span>
+            </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-muted-foreground">Full Name</p>
-                <p className="text-sm font-medium text-foreground">{intel.contact_name}</p>
+                <p className="text-sm font-medium text-foreground">{intel.secondary_contact_name}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Job Designation</p>
-                <p className="text-sm font-medium text-foreground">{intel.contact_title}</p>
+                <p className="text-sm font-medium text-foreground">{intel.secondary_contact_title || "Executive"}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Leadership Tenure</p>
-                <p className="text-sm text-foreground">{intel.tenure_at_company}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Follower Tier</p>
-                <p className="text-sm text-foreground">{intel.follower_count}</p>
-              </div>
-              <div className="sm:col-span-2">
-                <p className="text-xs text-muted-foreground">Work Email Address</p>
-                <div className="mt-1 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-1.5">
-                  <span className="text-xs font-mono text-foreground">{intel.work_email || "Email pending audit"}</span>
-                  {intel.work_email && (
-                    <button
-                      type="button"
-                      onClick={() => copyText("contact_email", intel.work_email)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {copiedField === "contact_email" ? "Copied" : "Copy"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Panel>
-
-          <Panel>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-              Recent Founder Activity (Field 20)
-            </span>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              {intel.recent_founder_activity}
-            </p>
-          </Panel>
-        </TabsContent>
-
-        <TabsContent value="company" className="space-y-4 pt-4">
-          <Panel>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-              Firmographic Foundation (Fields 1-6)
-            </span>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground">Organization</p>
-                <p className="text-sm font-medium text-foreground">{intel.company_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Website</p>
-                {intel.website ? (
+              {intel.secondary_linkedin_url && (
+                <div className="sm:col-span-2">
                   <a
-                    href={intel.website}
+                    href={intel.secondary_linkedin_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
                   >
-                    {intel.website.replace(/^https?:\/\//, "")} <ExternalLink className="size-3" />
+                    Verified Profile <ExternalLink className="size-3" />
                   </a>
-                ) : (
-                  <p className="text-sm text-muted-foreground">—</p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Headquarters</p>
-                <p className="text-sm text-foreground">{intel.headquarters}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Headcount</p>
-                <p className="text-sm text-foreground">{intel.employee_count}</p>
-              </div>
-              <div className="sm:col-span-2">
-                <p className="text-xs text-muted-foreground">Industry & Vertical</p>
-                <p className="text-sm text-foreground">{intel.industry_niche}</p>
-              </div>
-              <div className="sm:col-span-2 border-t border-border pt-2">
-                <p className="text-xs text-muted-foreground">Value Proposition</p>
-                <p className="mt-1 text-xs leading-relaxed text-foreground">{intel.value_proposition}</p>
-              </div>
-            </div>
-          </Panel>
-
-          <Panel>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-              Recent News & Website Stack (Fields 17, 18)
-            </span>
-            <p className="mt-2 text-xs leading-relaxed text-foreground">{intel.recent_company_news}</p>
-            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
-              {intel.website_tech_stack.map((tech) => (
-                <span
-                  key={tech}
-                  className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  {tech}
-                </span>
-              ))}
-            </div>
-          </Panel>
-        </TabsContent>
-
-        <TabsContent value="outreach" className="space-y-4 pt-4">
-          <form
-            className="space-y-4"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              await draft.run({
-                id: o.id,
-                subject: String(f.get("subject") || ""),
-                body: String(f.get("body") || ""),
-              });
-            }}
-          >
-            <Field
-              name="subject"
-              label="Email Subject Line (Field 22)"
-              defaultValue={intel.email_subject_line}
-              required
-            />
-            <Label htmlFor="body">AI Icebreaker Hook (Field 21)</Label>
-            <textarea
-              id="body"
-              name="body"
-              defaultValue={intel.ai_icebreaker}
-              maxLength={4000}
-              rows={5}
-              required
-              className={fieldClass}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-              <Button disabled={draft.isPending} type="submit" size="sm">
-                {draft.isPending ? "Saving…" : "Save Custom Angle"}
-              </Button>
-              {intel.work_email && (
-                <a
-                  href={`mailto:${intel.work_email}?subject=${encodeURIComponent(
-                    intel.email_subject_line,
-                  )}&body=${encodeURIComponent(intel.ai_icebreaker)}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs text-primary transition hover:bg-primary/20"
-                >
-                  Send via Mail Client →
-                </a>
+                </div>
               )}
             </div>
-          </form>
-        </TabsContent>
+          </Panel>
+        )}
 
-        <TabsContent value="audit" className="space-y-4 pt-4">
+        {intel.tertiary_contact_name && (
           <Panel>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-              Verification & Attribution (Fields 23, 24)
-            </span>
-            <div className="mt-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Audit Tag:</span>
-                <span className="font-medium text-emerald-400">{intel.verification_status}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                Tertiary Decision Maker
+              </span>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                Tertiary
+              </span>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Full Name</p>
+                <p className="text-sm font-medium text-foreground">{intel.tertiary_contact_name}</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Source Attribution:</span>
-                <span className="font-mono text-muted-foreground truncate max-w-[240px]">
-                  {intel.source_attribution}
-                </span>
+              <div>
+                <p className="text-xs text-muted-foreground">Job Designation</p>
+                <p className="text-sm font-medium text-foreground">{intel.tertiary_contact_title || "Technical Lead"}</p>
               </div>
+              {intel.tertiary_linkedin_url && (
+                <div className="sm:col-span-2">
+                  <a
+                    href={intel.tertiary_linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
+                  >
+                    Verified Profile <ExternalLink className="size-3" />
+                  </a>
+                </div>
+              )}
             </div>
           </Panel>
+        )}
+
+        <Panel>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Recent Founder Activity
+          </span>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {intel.recent_founder_activity || "No recent activity recorded."}
+          </p>
+        </Panel>
+      </TabsContent>
+
+      <TabsContent value="company" className="space-y-4 pt-4">
+        <Panel>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Firmographic Foundation
+          </span>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Organization</p>
+              <p className="text-sm font-medium text-foreground">{intel.company_name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Website</p>
+              {intel.website ? (
+                <a
+                  href={intel.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  {intel.website.replace(/^https?:\/\//, "")} <ExternalLink className="size-3" />
+                </a>
+              ) : (
+                <p className="text-sm text-muted-foreground">—</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Headquarters</p>
+              <p className="text-sm text-foreground">{intel.headquarters || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Headcount</p>
+              <p className="text-sm text-foreground">{intel.employee_count || "—"}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs text-muted-foreground">Industry & Vertical</p>
+              <p className="text-sm text-foreground">{intel.industry_niche || "—"}</p>
+            </div>
+            <div className="sm:col-span-2 border-t border-border pt-2">
+              <p className="text-xs text-muted-foreground">Value Proposition</p>
+              <p className="mt-1 text-xs leading-relaxed text-foreground">{intel.value_proposition || "—"}</p>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Recent News & Website Stack
+          </span>
+          <p className="mt-2 text-xs leading-relaxed text-foreground">{intel.recent_company_news || "—"}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
+            {intel.website_tech_stack.map((tech) => (
+              <span
+                key={tech}
+                className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-muted-foreground"
+              >
+                {tech}
+              </span>
+            ))}
+          </div>
+        </Panel>
+      </TabsContent>
+
+      <TabsContent value="outreach" className="space-y-4 pt-4">
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            await draft.run({
+              id: o.id,
+              subject: String(f.get("subject") || ""),
+              body: String(f.get("body") || ""),
+            });
+          }}
+        >
+          <Field
+            name="subject"
+            label="Email Subject Line"
+            defaultValue={intel.email_subject_line}
+            required
+          />
+          <Label htmlFor="body">AI Icebreaker Hook</Label>
+          <textarea
+            id="body"
+            name="body"
+            defaultValue={intel.ai_icebreaker}
+            maxLength={4000}
+            rows={5}
+            required
+            className={fieldClass}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <Button disabled={draft.isPending} type="submit" size="sm">
+              {draft.isPending ? "Saving…" : "Save Custom Angle"}
+            </Button>
+            {intel.work_email && (
+              <Link
+                href="/dashboard/outreach"
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs text-primary transition hover:bg-primary/20"
+              >
+                Open in Outreach Studio →
+              </Link>
+            )}
+          </div>
+        </form>
+      </TabsContent>
+
+      <TabsContent value="audit" className="space-y-4 pt-4">
+        <Panel>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Verification & Attribution
+          </span>
+          <div className="mt-3 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Audit Tag:</span>
+              <span className="font-medium text-emerald-400">{intel.verification_status}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Source Attribution:</span>
+              <span className="font-mono text-muted-foreground truncate max-w-[240px]">
+                {intel.source_attribution}
+              </span>
+            </div>
+          </div>
+        </Panel>
 
           <form
             className="space-y-4 border-t border-border pt-4"

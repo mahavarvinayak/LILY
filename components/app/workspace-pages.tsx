@@ -1,7 +1,18 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Building2, UserCheck, ExternalLink, ArrowUpRight } from "lucide-react";
+import {
+  Building2,
+  ExternalLink,
+  ArrowUpRight,
+  Download,
+  Users,
+  Mail,
+  Copy,
+  Check,
+  Linkedin,
+  Send,
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -9,6 +20,11 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { CompanyFavicon } from "./company-favicon";
+import { export31FieldsToCsv } from "@/lib/export-csv";
+import { extractLeadIntelligence, type LeadIntelligence31 } from "@/lib/intelligence";
 
 const moonArt = "/assets/lily-valley-moon.webp";
 import { animate, motion, useReducedMotion } from "framer-motion";
@@ -182,12 +198,24 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
   const [q, setQ] = useState("");
   const [asc, setAsc] = useState(true);
   const [inspectId, setInspectId] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const dc = useWrite(api.deleteCompany, "Company deleted");
   const dp = useWrite(api.deletePerson, "Person deleted");
+
+  function copyText(key: string, val: string) {
+    if (!val) return;
+    void navigator.clipboard.writeText(val);
+    setCopiedKey(key);
+    toast.success("Copied to clipboard.");
+    setTimeout(() => setCopiedKey(null), 2000);
+  }
 
   const companyRows = d.companies.map((c) => {
     const matchedPeople = d.people.filter((p) => p.company_id === c.id);
     const matchedOpp = d.opportunities.find((o) => o.company_id === c.id);
+    const intel = matchedOpp
+      ? extractLeadIntelligence(matchedOpp, c, matchedPeople[0])
+      : null;
     return {
       id: c.id,
       name: c.name,
@@ -195,28 +223,41 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
       location: c.location || "—",
       tech_stack: c.tech_stack || [],
       website: c.website,
+      linkedin_url: c.linkedin_url || intel?.company_linkedin_url || null,
+      employee_count: c.employee_count || intel?.employee_count || null,
+      industry: c.industry || intel?.industry_niche || null,
       contacts: matchedPeople,
       opportunity: matchedOpp,
+      intel,
+      rawCompany: c,
     };
   });
 
   const peopleRows = d.people.map((p) => {
     const matchedCompany = d.companies.find((c) => c.id === p.company_id);
-    const matchedOpp = d.opportunities.find((o) => o.person_id === p.id);
+    const matchedOpp = d.opportunities.find(
+      (o) => o.person_id === p.id || o.company_id === p.company_id,
+    );
+    const intel = matchedOpp
+      ? extractLeadIntelligence(matchedOpp, matchedCompany, p)
+      : null;
     return {
       id: p.id,
       name: `${p.first_name} ${p.last_name || ""}`.trim(),
       title: p.job_title || "Decision Maker",
+      role_tier: p.role_tier || "primary",
       company: matchedCompany,
       email: p.email || "",
       linkedin_url: p.linkedin_url,
       opportunity: matchedOpp,
+      intel,
+      rawPerson: p,
     };
   });
 
   const filteredCompanies = companyRows
     .filter((c) =>
-      `${c.name} ${c.domain} ${c.location} ${c.contacts.map((p) => `${p.first_name} ${p.last_name || ""} ${p.job_title}`).join(" ")}`
+      `${c.name} ${c.domain} ${c.location} ${c.industry || ""} ${c.contacts.map((p) => `${p.first_name} ${p.last_name || ""} ${p.job_title}`).join(" ")}`
         .toLowerCase()
         .includes(q.toLowerCase()),
     )
@@ -230,8 +271,30 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
     )
     .sort((a, b) => (asc ? 1 : -1) * a.name.localeCompare(b.name));
 
-  const inspectedCompany = kind === "companies" ? companyRows.find((c) => c.id === inspectId) : null;
-  const inspectedPerson = kind === "people" ? peopleRows.find((p) => p.id === inspectId) : null;
+  const inspectedCompany =
+    kind === "companies" ? companyRows.find((c) => c.id === inspectId) : null;
+  const inspectedPerson =
+    kind === "people" ? peopleRows.find((p) => p.id === inspectId) : null;
+
+  const currentIntel: LeadIntelligence31 | null = inspectedCompany
+    ? inspectedCompany.intel ||
+      (inspectedCompany.opportunity
+        ? extractLeadIntelligence(
+            inspectedCompany.opportunity,
+            inspectedCompany.rawCompany,
+            inspectedCompany.contacts[0],
+          )
+        : null)
+    : inspectedPerson
+      ? inspectedPerson.intel ||
+        (inspectedPerson.opportunity
+          ? extractLeadIntelligence(
+              inspectedPerson.opportunity,
+              inspectedPerson.company,
+              inspectedPerson.rawPerson,
+            )
+          : null)
+      : null;
 
   return (
     <>
@@ -239,74 +302,202 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
         title={kind === "companies" ? "Companies" : "People"}
         description={
           kind === "companies"
-            ? "Verified account intelligence. Every organization is linked directly to its decision-maker."
-            : "Direct commercial decision-makers. Every contact is linked directly to their organization."
+            ? "Verified account intelligence. Multi-threaded commercial footprint."
+            : "Direct commercial decision-makers. Every leader linked to their organization."
         }
         action={<CreateRecord kind={kind === "companies" ? "company" : "person"} />}
       />
       <Panel>
-        <div className="mb-5 flex gap-3">
-          <Input
-            aria-label={`Search ${kind}`}
-            placeholder={`Search ${kind}…`}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <Button variant="outline" onClick={() => setAsc((v) => !v)}>
-            Name {asc ? "↑" : "↓"}
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-1 items-center gap-3">
+            <Input
+              aria-label={`Search ${kind}`}
+              placeholder={`Search ${kind}…`}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="max-w-sm"
+            />
+            <Button variant="outline" size="sm" onClick={() => setAsc((v) => !v)}>
+              Name {asc ? "↑" : "↓"}
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (kind === "companies") {
+                export31FieldsToCsv(
+                  companyRows.map((c) => ({
+                    opp: c.opportunity,
+                    company: c.rawCompany,
+                  })),
+                  "lily_companies_directory",
+                );
+              } else {
+                export31FieldsToCsv(
+                  peopleRows.map((p) => ({
+                    opp: p.opportunity,
+                    company: p.company,
+                    person: p.rawPerson,
+                  })),
+                  "lily_people_directory",
+                );
+              }
+              toast.success("Downloaded 31-field intelligence CSV.");
+            }}
+            className="gap-1.5"
+          >
+            <Download className="size-3.5" />
+            Export 31-Field CSV
           </Button>
         </div>
 
         {kind === "companies" ? (
           filteredCompanies.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm">
+              <table className="w-full min-w-[850px] text-left text-sm">
                 <thead className="text-xs text-muted-foreground">
-                  <tr>
-                    <th className="p-3">Organization (Field 1, 2)</th>
-                    <th className="p-3">Headquarters (Field 3)</th>
-                    <th className="p-3">Decision Maker (Field 7, 8)</th>
+                  <tr className="border-b border-border">
+                    <th className="p-3">Organization</th>
+                    <th className="p-3">Vertical & Scale</th>
+                    <th className="p-3">Headquarters</th>
+                    <th className="p-3">Decision Makers</th>
                     <th className="p-3">Active Pipeline</th>
-                    <th className="p-3">Actions</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCompanies.map((c) => (
-                    <tr key={c.id} className="border-t border-border hover:bg-muted/20">
+                    <tr
+                      key={c.id}
+                      className="border-t border-border transition-colors hover:bg-muted/20"
+                    >
                       <td className="p-3">
-                        <button
-                          type="button"
-                          onClick={() => setInspectId(c.id)}
-                          className="text-left font-medium text-foreground hover:text-primary hover:underline"
-                        >
-                          {c.name}
-                        </button>
-                        {c.website && (
-                          <a
-                            href={c.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-                          >
-                            {c.website.replace(/^https?:\/\//, "")} <ExternalLink className="size-2.5" />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <CompanyFavicon
+                            domain={c.domain}
+                            website={c.website}
+                            name={c.name}
+                            size={36}
+                          />
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setInspectId(c.id)}
+                              className="text-left font-medium text-foreground hover:text-primary hover:underline"
+                            >
+                              {c.name}
+                            </button>
+                            <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                              {c.website && (
+                                <a
+                                  href={c.website}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 hover:text-primary"
+                                >
+                                  {c.website.replace(/^https?:\/\//, "")}
+                                  <ExternalLink className="size-2.5" />
+                                </a>
+                              )}
+                              {c.linkedin_url && (
+                                <a
+                                  href={c.linkedin_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-0.5 text-sky-400 hover:text-sky-300"
+                                >
+                                  <Linkedin className="size-3" />
+                                  <span>Page</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </td>
-                      <td className="p-3 text-xs text-muted-foreground">{c.location}</td>
+                      <td className="p-3">
+                        <div className="flex flex-col gap-1">
+                          {c.industry ? (
+                            <span className="inline-flex w-fit items-center rounded-md border border-border bg-card px-2 py-0.5 text-xs text-foreground">
+                              {c.industry}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                          {c.employee_count && (
+                            <span className="inline-flex w-fit items-center gap-1 text-[11px] text-muted-foreground">
+                              <Users className="size-3" />
+                              {c.employee_count} headcount
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {c.location}
+                      </td>
                       <td className="p-3">
                         {c.contacts.length ? (
-                          <div className="space-y-0.5">
-                            {c.contacts.map((p) => (
-                              <div key={p.id} className="text-xs">
-                                <span className="font-medium text-foreground">
-                                  {p.first_name} {p.last_name || ""}
-                                </span>
-                                <span className="text-muted-foreground"> · {p.job_title}</span>
-                              </div>
-                            ))}
+                          <div className="flex flex-col gap-1.5">
+                            {c.contacts.map((p) => {
+                              const tier = p.role_tier || "primary";
+                              const tierStyle =
+                                tier === "primary"
+                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                                  : tier === "secondary"
+                                    ? "border-sky-500/30 bg-sky-500/10 text-sky-400"
+                                    : "border-amber-500/30 bg-amber-500/10 text-amber-400";
+                              return (
+                                <div
+                                  key={p.id}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <span
+                                    className={cn(
+                                      "rounded-full border px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider",
+                                      tierStyle,
+                                    )}
+                                  >
+                                    {tier}
+                                  </span>
+                                  <span className="font-medium text-foreground">
+                                    {p.first_name} {p.last_name || ""}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    · {p.job_title}
+                                  </span>
+                                  {p.linkedin_url && (
+                                    <a
+                                      href={p.linkedin_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-muted-foreground hover:text-sky-400"
+                                    >
+                                      <Linkedin className="size-3" />
+                                    </a>
+                                  )}
+                                  {p.email && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        copyText(`c-email-${p.id}`, p.email!)
+                                      }
+                                      className="text-muted-foreground hover:text-primary"
+                                    >
+                                      {copiedKey === `c-email-${p.id}` ? (
+                                        <Check className="size-3 text-emerald-400" />
+                                      ) : (
+                                        <Copy className="size-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">No linked contact</span>
+                          <span className="text-xs italic text-muted-foreground">
+                            No linked contact
+                          </span>
                         )}
                       </td>
                       <td className="p-3">
@@ -315,13 +506,14 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                             href={`/dashboard/opportunities?lead=${c.opportunity.id}`}
                             className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                           >
-                            {c.opportunity.deal_name} <ArrowUpRight className="size-3" />
+                            {c.opportunity.deal_name}
+                            <ArrowUpRight className="size-3" />
                           </Link>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 text-right">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -349,135 +541,509 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
           )
         ) : filteredPeople.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left text-sm">
+            <table className="w-full min-w-[850px] text-left text-sm">
               <thead className="text-xs text-muted-foreground">
-                <tr>
-                  <th className="p-3">Decision Maker (Field 7, 8)</th>
-                  <th className="p-3">Organization (Field 1)</th>
-                  <th className="p-3">Channels (Field 9, 12)</th>
+                <tr className="border-b border-border">
+                  <th className="p-3">Decision Maker</th>
+                  <th className="p-3">Organization</th>
+                  <th className="p-3">Direct Channels</th>
                   <th className="p-3">Active Pipeline</th>
-                  <th className="p-3">Actions</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPeople.map((p) => (
-                  <tr key={p.id} className="border-t border-border hover:bg-muted/20">
-                    <td className="p-3">
-                      <button
-                        type="button"
-                        onClick={() => setInspectId(p.id)}
-                        className="text-left font-medium text-foreground hover:text-primary hover:underline"
-                      >
-                        {p.name}
-                      </button>
-                      <p className="text-xs text-muted-foreground">{p.title}</p>
-                    </td>
-                    <td className="p-3">
-                      {p.company ? (
-                        <div className="text-xs">
-                          <span className="font-medium text-foreground">{p.company.name}</span>
-                          {p.company.location && (
-                            <span className="block text-muted-foreground">{p.company.location}</span>
+                {filteredPeople.map((p) => {
+                  const tier = p.role_tier || "primary";
+                  const tierLabel =
+                    tier === "primary"
+                      ? "Primary Leader"
+                      : tier === "secondary"
+                        ? "Co-Founder / VP"
+                        : "Tech Head";
+                  const tierStyle =
+                    tier === "primary"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                      : tier === "secondary"
+                        ? "border-sky-500/30 bg-sky-500/10 text-sky-400"
+                        : "border-amber-500/30 bg-amber-500/10 text-amber-400";
+
+                  return (
+                    <tr
+                      key={p.id}
+                      className="border-t border-border transition-colors hover:bg-muted/20"
+                    >
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-mono text-xs font-semibold text-primary">
+                            {(p.name[0] || "P").toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setInspectId(p.id)}
+                                className="text-left font-medium text-foreground hover:text-primary hover:underline"
+                              >
+                                {p.name}
+                              </button>
+                              <span
+                                className={cn(
+                                  "rounded-full border px-1.5 py-0.2 text-[9px] font-semibold tracking-wider",
+                                  tierStyle,
+                                )}
+                              >
+                                {tierLabel}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {p.title}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        {p.company ? (
+                          <div className="flex items-center gap-2.5">
+                            <CompanyFavicon
+                              domain={p.company.domain}
+                              website={p.company.website}
+                              name={p.company.name}
+                              size={24}
+                            />
+                            <div className="text-xs">
+                              <span className="font-medium text-foreground">
+                                {p.company.name}
+                              </span>
+                              {p.company.location && (
+                                <span className="block text-muted-foreground">
+                                  {p.company.location}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground">
+                            No company linked
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {p.linkedin_url && (
+                            <a
+                              href={p.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground hover:border-sky-500/40 hover:text-sky-400"
+                            >
+                              <Linkedin className="size-3 text-sky-400" />
+                              <span>LinkedIn</span>
+                            </a>
+                          )}
+                          {p.email ? (
+                            <button
+                              type="button"
+                              onClick={() => copyText(`p-email-${p.id}`, p.email)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
+                            >
+                              {copiedKey === `p-email-${p.id}` ? (
+                                <Check className="size-3" />
+                              ) : (
+                                <Mail className="size-3" />
+                              )}
+                              <span>{p.email}</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Email unlisted
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">No company linked</span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-col gap-1 text-xs">
-                        {p.email && (
-                          <a href={`mailto:${p.email}`} className="text-primary hover:underline">
-                            {p.email}
-                          </a>
-                        )}
-                        {p.linkedin_url && (
-                          <a
-                            href={p.linkedin_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary"
+                      </td>
+                      <td className="p-3">
+                        {p.opportunity ? (
+                          <Link
+                            href={`/dashboard/opportunities?lead=${p.opportunity.id}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                           >
-                            LinkedIn <ExternalLink className="size-2.5" />
-                          </a>
+                            {p.opportunity.deal_name}
+                            <ArrowUpRight className="size-3" />
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      {p.opportunity ? (
-                        <Link
-                          href={`/dashboard/opportunities?lead=${p.opportunity.id}`}
-                          className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                      </td>
+                      <td className="p-3 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mr-2 h-7 text-xs"
+                          onClick={() => setInspectId(p.id)}
                         >
-                          {p.opportunity.deal_name} <ArrowUpRight className="size-3" />
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mr-2 h-7 text-xs"
-                        onClick={() => setInspectId(p.id)}
-                      >
-                        Inspect
-                      </Button>
-                      <DeleteButton
-                        label="person"
-                        onDelete={() => void dp.run(p.id)}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                          Inspect
+                        </Button>
+                        <DeleteButton
+                          label="person"
+                          onDelete={() => void dp.run(p.id)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
           <Empty
-            title={q ? "No matching decision-makers." : "No contacts registered yet."}
+            title={
+              q ? "No matching decision-makers." : "No contacts registered yet."
+            }
             description="Add a commercial contact or wait for your morning lead drop."
             action={!q && <CreateRecord kind="person" />}
           />
         )}
       </Panel>
 
-      <Sheet open={Boolean(inspectId)} onOpenChange={(open) => !open && setInspectId(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle className="font-display text-2xl">
-              {inspectedCompany ? inspectedCompany.name : inspectedPerson ? inspectedPerson.name : "Dossier"}
-            </SheetTitle>
-            <SheetDescription>
-              {inspectedCompany
-                ? "Organization intelligence and connected decision-makers."
-                : "Decision-maker profile and corporate alignment."}
-            </SheetDescription>
+      <Sheet
+        open={Boolean(inspectId)}
+        onOpenChange={(open) => !open && setInspectId(null)}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader className="pb-4 border-b border-border">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <SheetTitle className="font-display text-2xl">
+                  {inspectedCompany
+                    ? inspectedCompany.name
+                    : inspectedPerson
+                      ? inspectedPerson.name
+                      : "Dossier"}
+                </SheetTitle>
+                <SheetDescription>
+                  31 Pure Verified Intelligence Fields · 100% Sourced & Factual
+                </SheetDescription>
+              </div>
+              {currentIntel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    export31FieldsToCsv(
+                      [
+                        {
+                          opp: inspectedCompany?.opportunity || inspectedPerson?.opportunity,
+                          company: inspectedCompany?.rawCompany || inspectedPerson?.company,
+                          person: inspectedCompany?.contacts[0] || inspectedPerson?.rawPerson,
+                        },
+                      ],
+                      `lily_dossier_${(inspectedCompany?.name || inspectedPerson?.name || "lead").replace(/\s+/g, "_")}`,
+                    );
+                    toast.success("Downloaded account intelligence CSV.");
+                  }}
+                  className="gap-1.5 text-xs"
+                >
+                  <Download className="size-3.5" />
+                  Export Account CSV
+                </Button>
+              )}
+            </div>
           </SheetHeader>
 
-          {inspectedCompany && (
-            <div className="mt-6 space-y-4">
-              <Panel>
-                <div className="flex items-center gap-2 text-primary">
-                  <Building2 className="size-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Company Profile</span>
-                </div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between border-b border-border pb-2">
-                    <span className="text-xs text-muted-foreground">Website:</span>
-                    <span className="font-medium text-foreground">{inspectedCompany.website || "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-border pb-2">
-                    <span className="text-xs text-muted-foreground">Location:</span>
-                    <span className="text-foreground">{inspectedCompany.location}</span>
-                  </div>
-                  <div className="pt-1">
-                    <span className="text-xs text-muted-foreground">Tech Stack:</span>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {inspectedCompany.tech_stack.length ? (
-                        inspectedCompany.tech_stack.map((t) => (
-                          <span key={t} className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-muted-foreground">
+          {currentIntel ? (
+            <div className="mt-6 space-y-6">
+              <Tabs defaultValue="foundation" className="w-full">
+                <TabsList className="grid w-full grid-cols-5 text-xs">
+                  <TabsTrigger value="foundation">Foundation</TabsTrigger>
+                  <TabsTrigger value="leadership">Leadership</TabsTrigger>
+                  <TabsTrigger value="signals">Signals</TabsTrigger>
+                  <TabsTrigger value="tech">Tech Stack</TabsTrigger>
+                  <TabsTrigger value="outreach">Outreach</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="foundation" className="space-y-4 pt-4">
+                  <Panel>
+                    <div className="flex items-center gap-2 text-primary">
+                      <Building2 className="size-4" />
+                      <span className="text-xs font-semibold uppercase tracking-wider">
+                        Company Foundation & Footprint
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">01. Company Name</span>
+                        <span className="font-medium text-foreground">{currentIntel.company_name}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">02. Domain / Website</span>
+                        {currentIntel.website ? (
+                          <a
+                            href={currentIntel.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            {currentIntel.website}
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">03. Company LinkedIn</span>
+                        {currentIntel.company_linkedin_url ? (
+                          <a
+                            href={currentIntel.company_linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sky-400 hover:underline"
+                          >
+                            LinkedIn Page
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">04. Headquarters</span>
+                        <span className="text-foreground">{currentIntel.headquarters || "—"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">05. Employee Headcount</span>
+                        <span className="font-mono text-foreground">{currentIntel.employee_count || "—"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">06. Industry Niche</span>
+                        <span className="text-foreground">{currentIntel.industry_niche || "—"}</span>
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-xs text-muted-foreground">07. Value Proposition</span>
+                        <p className="mt-1.5 text-xs leading-relaxed text-foreground">
+                          {currentIntel.value_proposition || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </Panel>
+                </TabsContent>
+
+                <TabsContent value="leadership" className="space-y-4 pt-4">
+                  <Panel>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                        Primary Decision Maker (Mandatory)
+                      </span>
+                      <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                        Primary
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">08. Contact Name</span>
+                        <span className="font-semibold text-foreground">{currentIntel.contact_name}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">09. Job Title</span>
+                        <span className="text-foreground">{currentIntel.job_title}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">10. Personal LinkedIn</span>
+                        {currentIntel.linkedin_url ? (
+                          <a
+                            href={currentIntel.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sky-400 hover:underline"
+                          >
+                            Verified Profile
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">11. Tenure at Company</span>
+                        <span className="text-foreground">{currentIntel.tenure_at_company || "—"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">12. Follower Count</span>
+                        <span className="font-mono text-foreground">{currentIntel.follower_count || "—"}</span>
+                      </div>
+                      <div className="flex justify-between pt-1">
+                        <span className="text-xs text-muted-foreground">13. Corporate Work Email</span>
+                        {currentIntel.work_email ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-primary">{currentIntel.work_email}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyText("dossier-email", currentIntel.work_email)}
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              {copiedKey === "dossier-email" ? (
+                                <Check className="size-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="size-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground">Not publicly verifiable</span>
+                        )}
+                      </div>
+                    </div>
+                  </Panel>
+
+                  <Panel>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-sky-400">
+                        Secondary Decision Maker (Multi-Threading)
+                      </span>
+                      <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-400">
+                        Secondary
+                      </span>
+                    </div>
+                    {currentIntel.secondary_contact_name ? (
+                      <div className="mt-4 space-y-3 text-sm">
+                        <div className="flex justify-between border-b border-border pb-2">
+                          <span className="text-xs text-muted-foreground">14. Contact Name</span>
+                          <span className="font-semibold text-foreground">{currentIntel.secondary_contact_name}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-border pb-2">
+                          <span className="text-xs text-muted-foreground">15. Designation</span>
+                          <span className="text-foreground">{currentIntel.secondary_contact_title || "Executive"}</span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                          <span className="text-xs text-muted-foreground">16. Personal LinkedIn</span>
+                          {currentIntel.secondary_linkedin_url ? (
+                            <a
+                              href={currentIntel.secondary_linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sky-400 hover:underline"
+                            >
+                              Verified Profile
+                              <ExternalLink className="size-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        No secondary decision maker recorded for this account.
+                      </p>
+                    )}
+                  </Panel>
+
+                  <Panel>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                        Tertiary Decision Maker (Multi-Threading)
+                      </span>
+                      <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                        Tertiary
+                      </span>
+                    </div>
+                    {currentIntel.tertiary_contact_name ? (
+                      <div className="mt-4 space-y-3 text-sm">
+                        <div className="flex justify-between border-b border-border pb-2">
+                          <span className="text-xs text-muted-foreground">17. Contact Name</span>
+                          <span className="font-semibold text-foreground">{currentIntel.tertiary_contact_name}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-border pb-2">
+                          <span className="text-xs text-muted-foreground">18. Designation</span>
+                          <span className="text-foreground">{currentIntel.tertiary_contact_title || "Technical Lead"}</span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                          <span className="text-xs text-muted-foreground">19. Personal LinkedIn</span>
+                          {currentIntel.tertiary_linkedin_url ? (
+                            <a
+                              href={currentIntel.tertiary_linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sky-400 hover:underline"
+                            >
+                              Verified Profile
+                              <ExternalLink className="size-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        No tertiary decision maker recorded for this account.
+                      </p>
+                    )}
+                  </Panel>
+                </TabsContent>
+
+                <TabsContent value="signals" className="space-y-4 pt-4">
+                  <Panel>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                        Commercial Urgency & Buying Signals
+                      </span>
+                      <span className="text-xs text-muted-foreground">{currentIntel.trigger_age}</span>
+                    </div>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div>
+                        <span className="text-xs text-muted-foreground">20. Buying Trigger</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">
+                          {currentIntel.buying_trigger}
+                        </p>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">21. Trigger Age / Timestamp</span>
+                        <span className="font-mono text-foreground">{currentIntel.trigger_age || "Active"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">22. Proof Link</span>
+                        {currentIntel.trigger_url ? (
+                          <a
+                            href={currentIntel.trigger_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            Primary Proof Trail
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-xs text-muted-foreground">23. Intent Level</span>
+                        <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                          {currentIntel.intent_level}
+                        </span>
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-xs text-muted-foreground">24. Recent Company News / Expansion</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">
+                          {currentIntel.recent_company_news || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </Panel>
+                </TabsContent>
+
+                <TabsContent value="tech" className="space-y-4 pt-4">
+                  <Panel>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                      25. Website Tech Stack Footprint
+                    </span>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {currentIntel.website_tech_stack.length ? (
+                        currentIntel.website_tech_stack.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-md border border-border bg-card px-2 py-0.5 text-xs text-foreground"
+                          >
                             {t}
                           </span>
                         ))
@@ -485,61 +1051,95 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </div>
-                  </div>
-                </div>
-              </Panel>
+                  </Panel>
 
-              <Panel>
-                <span className="text-xs font-semibold uppercase tracking-wider text-primary">Linked Decision Makers</span>
-                <div className="mt-3 space-y-2">
-                  {inspectedCompany.contacts.length ? (
-                    inspectedCompany.contacts.map((p) => (
-                      <div key={p.id} className="rounded-xl border border-border p-3 text-xs">
-                        <p className="font-semibold text-foreground">{p.first_name} {p.last_name || ""}</p>
-                        <p className="text-muted-foreground">{p.job_title}</p>
-                        {p.email && <p className="mt-1 font-mono text-primary">{p.email}</p>}
+                  <Panel>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                      26. Required Engineering Stack (From Active Hiring)
+                    </span>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {currentIntel.required_engineering_stack.length ? (
+                        currentIntel.required_engineering_stack.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                          >
+                            {t}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Standard requirements</span>
+                      )}
+                    </div>
+                  </Panel>
+                </TabsContent>
+
+                <TabsContent value="outreach" className="space-y-4 pt-4">
+                  <Panel>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                      Outreach & Founder Assets
+                    </span>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div>
+                        <span className="text-xs text-muted-foreground">27. Recent Founder Post Context</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">
+                          {currentIntel.recent_founder_activity || "—"}
+                        </p>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No decision-maker recorded for this organization.</p>
-                  )}
-                </div>
-              </Panel>
-            </div>
-          )}
+                      <div className="border-t border-border pt-3">
+                        <span className="text-xs text-muted-foreground">28. High-Conversion Subject Line</span>
+                        <p className="mt-1 font-mono text-xs text-foreground">
+                          {currentIntel.email_subject_line}
+                        </p>
+                      </div>
+                      <div className="border-t border-border pt-3">
+                        <span className="text-xs text-muted-foreground">29. AI Icebreaker Hook</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">
+                          {currentIntel.ai_icebreaker}
+                        </p>
+                      </div>
+                      <div className="flex justify-between border-t border-border pt-3">
+                        <span className="text-xs text-muted-foreground">30. Verification Integrity</span>
+                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                          {currentIntel.verification_status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-border pt-3">
+                        <span className="text-xs text-muted-foreground">31. Source Attribution</span>
+                        {currentIntel.source_attribution ? (
+                          <a
+                            href={currentIntel.source_attribution}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            Audit Provenance
+                            <ExternalLink className="size-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </div>
+                  </Panel>
 
-          {inspectedPerson && (
-            <div className="mt-6 space-y-4">
-              <Panel>
-                <div className="flex items-center gap-2 text-primary">
-                  <UserCheck className="size-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Decision Maker Dossier</span>
-                </div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between border-b border-border pb-2">
-                    <span className="text-xs text-muted-foreground">Designation:</span>
-                    <span className="font-medium text-foreground">{inspectedPerson.title}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-border pb-2">
-                    <span className="text-xs text-muted-foreground">Affiliated Organization:</span>
-                    <span className="font-medium text-foreground">{inspectedPerson.company?.name || "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-border pb-2">
-                    <span className="text-xs text-muted-foreground">Work Email:</span>
-                    <span className="font-mono text-primary">{inspectedPerson.email || "—"}</span>
-                  </div>
-                  <div className="flex justify-between pt-1">
-                    <span className="text-xs text-muted-foreground">LinkedIn:</span>
-                    {inspectedPerson.linkedin_url ? (
-                      <a href={inspectedPerson.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
-                        Profile Link ↗
-                      </a>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </div>
-                </div>
-              </Panel>
+                  {currentIntel.work_email && (
+                    <div className="flex justify-end pt-2">
+                      <Link
+                        href="/dashboard/outreach"
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                      >
+                        <Send className="size-3.5" />
+                        Open in Outreach Studio
+                      </Link>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+          ) : (
+            <div className="mt-8 text-center text-xs text-muted-foreground">
+              No full intelligence dossier recorded.
             </div>
           )}
         </SheetContent>

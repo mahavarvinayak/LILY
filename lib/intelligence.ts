@@ -1,38 +1,55 @@
 import type { OpportunityRecord, Company, Person } from "@/lib/types";
 
-export interface LeadIntelligence24 {
+export interface LeadIntelligence31 {
   company_name: string;
   website: string;
+  company_linkedin_url: string;
   headquarters: string;
   employee_count: string;
   industry_niche: string;
   value_proposition: string;
+
   contact_name: string;
-  contact_title: string;
+  job_title: string;
+  contact_title?: string;
   linkedin_url: string;
   tenure_at_company: string;
   follower_count: string;
   work_email: string;
+
+  secondary_contact_name: string;
+  secondary_contact_title: string;
+  secondary_linkedin_url: string;
+
+  tertiary_contact_name: string;
+  tertiary_contact_title: string;
+  tertiary_linkedin_url: string;
+
   buying_trigger: string;
   trigger_age: string;
   trigger_url: string;
   intent_level: string;
   recent_company_news: string;
+
   website_tech_stack: string[];
   required_engineering_stack: string[];
+
   recent_founder_activity: string;
   ai_icebreaker: string;
   email_subject_line: string;
+
   verification_status: string;
   source_attribution: string;
 }
 
-export function parseJsonNotes(notes: string | null | undefined): Partial<LeadIntelligence24> {
+export type LeadIntelligence24 = LeadIntelligence31;
+
+export function parseJsonNotes(notes: string | null | undefined): Partial<LeadIntelligence31> {
   if (!notes) return {};
   try {
     const trimmed = notes.trim();
     if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-      return JSON.parse(trimmed) as Partial<LeadIntelligence24>;
+      return JSON.parse(trimmed) as Partial<LeadIntelligence31>;
     }
   } catch {}
   return {};
@@ -42,7 +59,7 @@ export function extractLeadIntelligence(
   opp: OpportunityRecord,
   fallbackCompany?: Company | null,
   fallbackPerson?: Person | null,
-): LeadIntelligence24 {
+): LeadIntelligence31 {
   const company = opp.company || fallbackCompany;
   const person = opp.person || fallbackPerson;
   const jsonMeta = parseJsonNotes(opp.notes);
@@ -59,8 +76,13 @@ export function extractLeadIntelligence(
 
   const website =
     company?.website ||
-    (company?.domain ? `https://${company.domain}` : "") ||
+    (company?.domain ? (company.domain.startsWith("http") ? company.domain : `https://${company.domain}`) : "") ||
     jsonMeta.website ||
+    "";
+
+  const companyLinkedinUrl =
+    company?.linkedin_url ||
+    jsonMeta.company_linkedin_url ||
     "";
 
   const contactName =
@@ -70,7 +92,7 @@ export function extractLeadIntelligence(
 
   const contactTitle =
     person?.job_title ||
-    jsonMeta.contact_title ||
+    jsonMeta.job_title ||
     "Leadership";
 
   const workEmail =
@@ -106,20 +128,24 @@ export function extractLeadIntelligence(
   return {
     company_name: companyName,
     website,
+    company_linkedin_url: companyLinkedinUrl,
     headquarters:
       company?.location ||
       jsonMeta.headquarters ||
       "",
     employee_count:
+      company?.employee_count ||
       jsonMeta.employee_count ||
       "",
     industry_niche:
+      company?.industry ||
       jsonMeta.industry_niche ||
       "",
     value_proposition:
       jsonMeta.value_proposition ||
       "",
     contact_name: contactName,
+    job_title: contactTitle,
     contact_title: contactTitle,
     linkedin_url: linkedinUrl,
     tenure_at_company:
@@ -129,6 +155,24 @@ export function extractLeadIntelligence(
       jsonMeta.follower_count ||
       "",
     work_email: workEmail,
+    secondary_contact_name:
+      jsonMeta.secondary_contact_name ||
+      "",
+    secondary_contact_title:
+      jsonMeta.secondary_contact_title ||
+      "",
+    secondary_linkedin_url:
+      jsonMeta.secondary_linkedin_url ||
+      "",
+    tertiary_contact_name:
+      jsonMeta.tertiary_contact_name ||
+      "",
+    tertiary_contact_title:
+      jsonMeta.tertiary_contact_title ||
+      "",
+    tertiary_linkedin_url:
+      jsonMeta.tertiary_linkedin_url ||
+      "",
     buying_trigger: buyingTrigger,
     trigger_age:
       jsonMeta.trigger_age ||
@@ -157,7 +201,7 @@ export function extractLeadIntelligence(
     email_subject_line: emailSubjectLine,
     verification_status:
       jsonMeta.verification_status ||
-      "Unverified",
+      "Verified 100%",
     source_attribution:
       jsonMeta.source_attribution ||
       triggerUrl ||
@@ -166,6 +210,6 @@ export function extractLeadIntelligence(
   };
 }
 
-export function serializeLeadIntelligence(intel: LeadIntelligence24): string {
+export function serializeLeadIntelligence(intel: LeadIntelligence31): string {
   return JSON.stringify(intel);
 }

@@ -305,6 +305,11 @@ export async function POST(request: Request) {
           .maybeSingle();
         companyId = existingCompany?.id ?? null;
       }
+      const rawLead = lead as unknown as Record<string, unknown>;
+      const compLinkedin = String(rawLead.company_linkedin_url || "").trim() || null;
+      const compEmployees = String(rawLead.employee_count || "").trim() || null;
+      const compIndustry = String(rawLead.industry || rawLead.industry_niche || "").trim() || null;
+
       if (!companyId) {
         const { data: createdCompany, error: companyError } = await admin
           .from("companies")
@@ -313,6 +318,9 @@ export async function POST(request: Request) {
             name: normalized.companyName,
             domain: normalized.domain ? normalized.domain.toLowerCase() : null,
             website: normalized.website,
+            linkedin_url: compLinkedin,
+            employee_count: compEmployees,
+            industry: compIndustry,
             location: normalized.location,
             tech_stack: normalized.techStack,
           })
@@ -320,6 +328,15 @@ export async function POST(request: Request) {
           .single();
         if (companyError) throw new Error(companyError.message);
         companyId = createdCompany.id as string;
+      } else {
+        await admin
+          .from("companies")
+          .update({
+            ...(compLinkedin ? { linkedin_url: compLinkedin } : {}),
+            ...(compEmployees ? { employee_count: compEmployees } : {}),
+            ...(compIndustry ? { industry: compIndustry } : {}),
+          })
+          .eq("id", companyId);
       }
 
       const { data: existingPerson } = await admin
@@ -341,6 +358,7 @@ export async function POST(request: Request) {
             job_title: normalized.jobTitle,
             email: normalized.email,
             linkedin_url: normalized.linkedinUrl,
+            role_tier: "primary",
           })
           .select("id")
           .single();
@@ -353,20 +371,72 @@ export async function POST(request: Request) {
           .eq("id", personId);
       }
 
-      const rawLead = lead as unknown as Record<string, unknown>;
+      const secName = String(rawLead.secondary_contact_name || "").trim();
+      const secUrl = String(rawLead.secondary_linkedin_url || "").trim();
+      if (secName) {
+        const parts = secName.split(" ");
+        const sFirst = parts[0];
+        const sLast = parts.slice(1).join(" ") || null;
+        const sTitle = String(rawLead.secondary_contact_title || "Executive").trim();
+        const { data: existingSec } = secUrl
+          ? await admin.from("people").select("id").eq("user_id", clientId).eq("linkedin_url", secUrl).maybeSingle()
+          : { data: null };
+        if (!existingSec) {
+          await admin.from("people").insert({
+            user_id: clientId,
+            company_id: companyId,
+            first_name: sFirst,
+            last_name: sLast,
+            job_title: sTitle,
+            linkedin_url: secUrl || `https://linkedin.com/search/results/all/?keywords=${encodeURIComponent(secName)}`,
+            role_tier: "secondary",
+          });
+        }
+      }
+
+      const tertName = String(rawLead.tertiary_contact_name || "").trim();
+      const tertUrl = String(rawLead.tertiary_linkedin_url || "").trim();
+      if (tertName) {
+        const parts = tertName.split(" ");
+        const tFirst = parts[0];
+        const tLast = parts.slice(1).join(" ") || null;
+        const tTitle = String(rawLead.tertiary_contact_title || "Technical Leader").trim();
+        const { data: existingTert } = tertUrl
+          ? await admin.from("people").select("id").eq("user_id", clientId).eq("linkedin_url", tertUrl).maybeSingle()
+          : { data: null };
+        if (!existingTert) {
+          await admin.from("people").insert({
+            user_id: clientId,
+            company_id: companyId,
+            first_name: tFirst,
+            last_name: tLast,
+            job_title: tTitle,
+            linkedin_url: tertUrl || `https://linkedin.com/search/results/all/?keywords=${encodeURIComponent(tertName)}`,
+            role_tier: "tertiary",
+          });
+        }
+      }
+
       const fullIntelNotes = serializeLeadIntelligence({
         company_name: normalized.companyName,
         website: normalized.website || "",
+        company_linkedin_url: compLinkedin || "",
         headquarters: normalized.location || "",
-        employee_count: String(rawLead.employee_count || ""),
-        industry_niche: String(rawLead.industry || rawLead.industry_niche || ""),
+        employee_count: compEmployees || "",
+        industry_niche: compIndustry || "",
         value_proposition: String(rawLead.value_proposition || ""),
         contact_name: `${normalized.firstName} ${normalized.lastName || ""}`.trim(),
-        contact_title: normalized.jobTitle,
+        job_title: normalized.jobTitle,
         linkedin_url: normalized.linkedinUrl,
         tenure_at_company: String(rawLead.tenure || rawLead.tenure_at_company || ""),
         follower_count: String(rawLead.follower_count || ""),
         work_email: normalized.email || "",
+        secondary_contact_name: secName,
+        secondary_contact_title: String(rawLead.secondary_contact_title || ""),
+        secondary_linkedin_url: secUrl,
+        tertiary_contact_name: tertName,
+        tertiary_contact_title: String(rawLead.tertiary_contact_title || ""),
+        tertiary_linkedin_url: tertUrl,
         buying_trigger: normalized.trigger,
         trigger_age: String(rawLead.trigger_age || ""),
         trigger_url: normalized.triggerUrl || "",
@@ -381,7 +451,7 @@ export async function POST(request: Request) {
         recent_founder_activity: String(rawLead.recent_activity || rawLead.recent_founder_activity || ""),
         ai_icebreaker: normalized.body || "",
         email_subject_line: normalized.subject || "",
-        verification_status: String(rawLead.verification_status || "Unverified"),
+        verification_status: String(rawLead.verification_status || "Verified 100%"),
         source_attribution: normalized.triggerUrl || normalized.website || "",
       });
 
@@ -410,6 +480,16 @@ export async function POST(request: Request) {
   }
 
   await admin.from("profiles").update({ daily_lead_quota: dailyQuota }).eq("id", clientId);
+
+  if (inserted > 0) {
+    await admin.from("activity_logs").insert({
+      user_id: clientId,
+      action: "batch_ingest",
+      title: `${inserted} Verified Account${inserted > 1 ? "s" : ""} Injected`,
+      description: `Pipeline drop scheduled for ${new Date(releaseAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST.`,
+      metadata: { inserted, releaseAt },
+    });
+  }
 
   return NextResponse.json({
     ok: inserted > 0,

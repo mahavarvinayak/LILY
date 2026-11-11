@@ -165,6 +165,14 @@ export async function POST(request: Request) {
           .update({ outreach_dispatched: true })
           .eq("id", opportunityId)
           .eq("user_id", userId);
+
+        await supabase.from("activity_logs").insert({
+          user_id: userId,
+          action: "email_dispatched",
+          title: `Outreach Sent: ${to}`,
+          description: `Subject: "${subject}" via custom SMTP.`,
+          metadata: { opportunityId, to, subject, provider: "custom_smtp" },
+        });
       }
 
       return NextResponse.json({
@@ -213,6 +221,14 @@ export async function POST(request: Request) {
         .update({ outreach_dispatched: true })
         .eq("id", opportunityId)
         .eq("user_id", userId);
+
+      await supabase.from("activity_logs").insert({
+        user_id: userId,
+        action: "email_dispatched",
+        title: `Outreach Sent: ${to}`,
+        description: `Subject: "${subject}" via Resend.`,
+        metadata: { opportunityId, to, subject, provider: "resend" },
+      });
     }
 
     return NextResponse.json({

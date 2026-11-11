@@ -22,6 +22,9 @@ export interface Company {
   name: string;
   domain: string | null;
   website: string | null;
+  linkedin_url?: string | null;
+  employee_count?: string | null;
+  industry?: string | null;
   location: string | null;
   address?: string | null;
   tech_stack: string[] | null;
@@ -38,6 +41,7 @@ export interface Person {
   email: string | null;
   phone?: string | null;
   linkedin_url: string;
+  role_tier?: "primary" | "secondary" | "tertiary";
   created_at: string;
 }
 
@@ -95,6 +99,17 @@ export interface TeamMember {
   joined_at: string;
 }
 
+export interface ActivityLog {
+  id: string;
+  user_id: string;
+  action: string;
+  title: string;
+  description: string | null;
+  metadata?: Record<string, unknown> | null;
+  read: boolean;
+  created_at: string;
+}
+
 export interface WorkspaceData {
   profile: Profile;
   companies: Company[];
@@ -102,8 +117,8 @@ export interface WorkspaceData {
   opportunities: OpportunityRecord[];
   tasks: Task[];
   team_members?: TeamMember[];
+  activities?: ActivityLog[];
   isAdmin: boolean;
-  /** True only for the server-rendered placeholder, before real rows load. */
   pending?: boolean;
 }
 
@@ -119,15 +134,48 @@ export interface AdminClientRow {
 export interface IngestedLead {
   company_name: string;
   website?: string;
+  company_linkedin_url?: string;
   domain?: string;
   location?: string;
-  tech_stack?: string[];
+  headquarters?: string;
+  employee_count?: string;
+  industry_niche?: string;
+  industry?: string;
+  value_proposition?: string;
+
   contact_name: string;
   job_title: string;
   linkedin_url: string;
+  tenure_at_company?: string;
+  follower_count?: string;
   email?: string;
+  work_email?: string;
+
+  secondary_contact_name?: string;
+  secondary_contact_title?: string;
+  secondary_linkedin_url?: string;
+
+  tertiary_contact_name?: string;
+  tertiary_contact_title?: string;
+  tertiary_linkedin_url?: string;
+
   buying_trigger: string;
+  trigger_age?: string;
   trigger_url?: string;
+  intent_level?: string;
+  recent_company_news?: string;
+
+  tech_stack?: string[];
+  website_tech_stack?: string[];
+  required_engineering_stack?: string[];
+
+  recent_founder_activity?: string;
+  ai_icebreaker?: string;
+  email_subject_line?: string;
+
+  verification_status?: string;
+  source_attribution?: string;
+
   deal_name?: string;
   deal_value?: number;
   notes?: string;

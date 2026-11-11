@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import { createClient } from "@/lib/supabase/client";
 import { normalizeAgencyName } from "@/lib/validation";
 import type {
+  ActivityLog,
   Company,
   OpportunityRecord,
   Person,
@@ -50,12 +51,13 @@ export async function fetchWorkspace(): Promise<WorkspaceData> {
       opportunities: [],
       tasks: [],
       team_members: [],
+      activities: [],
     };
   }
 
   const supabase = getSupabase();
   const userId = await requireUserId();
-  const [profileRes, companiesRes, peopleRes, oppsRes, tasksRes, teamRes] =
+  const [profileRes, companiesRes, peopleRes, oppsRes, tasksRes, teamRes, activitiesRes] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
       supabase.from("companies").select("*").eq("user_id", userId).order("name"),
@@ -76,6 +78,12 @@ export async function fetchWorkspace(): Promise<WorkspaceData> {
         .select("*")
         .eq("agency_id", userId)
         .order("joined_at", { ascending: true }),
+      supabase
+        .from("activity_logs")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(30),
     ]);
 
   if (profileRes.error) throw profileRes.error;
@@ -97,6 +105,7 @@ export async function fetchWorkspace(): Promise<WorkspaceData> {
     opportunities,
     tasks: (tasksRes.data ?? []) as Task[],
     team_members: (teamRes.data ?? []) as TeamMember[],
+    activities: (activitiesRes.data ?? []) as ActivityLog[],
   };
 }
 
@@ -226,6 +235,9 @@ export const api = {
   async createCompany(input: {
     name: string;
     website?: string;
+    linkedin_url?: string;
+    employee_count?: string;
+    industry?: string;
     location?: string;
     tech_stack?: string[];
   }) {
@@ -248,6 +260,9 @@ export const api = {
           user_id,
           name,
           website,
+          linkedin_url: input.linkedin_url?.trim() || null,
+          employee_count: input.employee_count?.trim() || null,
+          industry: input.industry?.trim() || null,
           domain,
           location: input.location?.trim() || null,
           tech_stack: input.tech_stack?.length ? input.tech_stack : null,
@@ -268,6 +283,7 @@ export const api = {
     email?: string | null;
     linkedin_url?: string;
     company_id?: string | null;
+    role_tier?: "primary" | "secondary" | "tertiary";
   }) {
     const supabase = getSupabase();
     const user_id = await requireUserId();
@@ -283,6 +299,7 @@ export const api = {
           email: input.email?.trim() || null,
           linkedin_url: input.linkedin_url?.trim() ?? "",
           company_id: input.company_id ?? null,
+          role_tier: input.role_tier ?? "primary",
         })
         .select("id")
         .single(),
@@ -292,6 +309,33 @@ export const api = {
   async deletePerson(id: string) {
     const supabase = getSupabase();
     check(await supabase.from("people").delete().eq("id", id));
+  },
+  async markActivityRead(id: string) {
+    const supabase = getSupabase();
+    check(await supabase.from("activity_logs").update({ read: true }).eq("id", id));
+  },
+  async markAllActivitiesRead() {
+    const supabase = getSupabase();
+    const user_id = await requireUserId();
+    check(await supabase.from("activity_logs").update({ read: true }).eq("user_id", user_id));
+  },
+  async logActivity(input: {
+    action: string;
+    title: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const supabase = getSupabase();
+    const user_id = await requireUserId();
+    check(
+      await supabase.from("activity_logs").insert({
+        user_id,
+        action: input.action,
+        title: input.title,
+        description: input.description || null,
+        metadata: input.metadata || null,
+      }),
+    );
   },
   async addTeamMember(input: { name: string; email: string; role: string }) {
     const supabase = getSupabase();

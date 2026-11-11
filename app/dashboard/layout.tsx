@@ -22,12 +22,15 @@ import {
   PanelLeft,
   Search,
   LogOut,
+  Send,
 } from "lucide-react";
 import { workspaceQuery } from "@/lib/workspace";
 import { parseIcpConfig } from "@/lib/icp";
 import { LilyLogo } from "@/components/lily/lily-mark";
 import { LilyLoader } from "@/components/lily/lily-loader";
 import { AgentBar } from "@/components/app/agent-bar";
+import { MorningDropModal } from "@/components/app/morning-drop-modal";
+import { ActivityCenter } from "@/components/app/activity-center";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -52,6 +55,7 @@ const nav = [
   { label: "Assistant", href: "/dashboard", icon: MessageCircle },
   { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
   { label: "Opportunities", href: "/dashboard/opportunities", icon: Target },
+  { label: "Outreach Studio", href: "/dashboard/outreach", icon: Send },
   { label: "Companies", href: "/dashboard/companies", icon: Building2 },
   { label: "People", href: "/dashboard/people", icon: Users },
   { label: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
@@ -93,6 +97,10 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
   const counts: Record<string, number> = {
     "/dashboard/opportunities": data.opportunities.length,
+    "/dashboard/outreach": data.opportunities.filter((o) => {
+      const p = Array.isArray(o.person) ? o.person[0] : o.person;
+      return Boolean(p?.email && !o.outreach_dispatched);
+    }).length,
     "/dashboard/companies": data.companies.length,
     "/dashboard/people": data.people.length,
     "/dashboard/tasks": data.tasks.filter((t) => !t.completed).length,
@@ -270,6 +278,8 @@ function DashboardShell({ children }: { children: ReactNode }) {
             </kbd>
           </button>
 
+          <ActivityCenter />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -306,6 +316,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="p-4 md:p-8">{children}</main>
+        <MorningDropModal />
         <AgentBar />
       </div>
 
