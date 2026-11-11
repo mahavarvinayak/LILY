@@ -1239,38 +1239,28 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">28. High-Conversion Subject Line</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">28. Cold Email Subject Line</span>
                         <p className="mt-1 font-mono text-xs text-foreground">
                           {currentIntel.email_subject_line}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">29. AI Icebreaker Hook</span>
-                        <p className="mt-1 text-xs leading-relaxed text-foreground">
+                        <span className="shrink-0 text-xs text-muted-foreground">29. Cold Email Pitch</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground whitespace-pre-line">
                           {currentIntel.ai_icebreaker}
                         </p>
                       </div>
-                      <div className="flex justify-between border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">30. Verification Integrity</span>
-                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                          {currentIntel.verification_status}
-                        </span>
+                      <div className="border-t border-border pt-3">
+                        <span className="shrink-0 text-xs text-muted-foreground">30. LinkedIn Connection Note (under 300 chars)</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground">
+                          {currentIntel.linkedin_note || "—"}
+                        </p>
                       </div>
-                      <div className="flex justify-between border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">31. Source Attribution</span>
-                        {currentIntel.source_attribution ? (
-                          <a
-                            href={currentIntel.source_attribution}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-primary hover:underline"
-                          >
-                            Audit Provenance
-                            <ExternalLink className="size-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                      <div className="border-t border-border pt-3">
+                        <span className="shrink-0 text-xs text-muted-foreground">31. LinkedIn InMail / DM Pitch</span>
+                        <p className="mt-1 text-xs leading-relaxed text-foreground whitespace-pre-line">
+                          {currentIntel.linkedin_message || "—"}
+                        </p>
                       </div>
                     </div>
                   </Panel>

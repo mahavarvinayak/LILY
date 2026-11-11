@@ -30,7 +30,7 @@ import { CompanyFavicon } from "@/components/app/company-favicon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { extractLeadIntelligence, sanitizeTriggerText } from "@/lib/intelligence";
+import { extractLeadIntelligence, sanitizeTriggerText, synthesizeDefaultPitch } from "@/lib/intelligence";
 import { export31FieldsToCsv } from "@/lib/export-csv";
 import { api, workspaceKey } from "@/lib/workspace";
 import { cn, formatInr } from "@/lib/utils";
@@ -118,6 +118,13 @@ export default function OutreachStudioPage() {
     setRecipientEmail(activeItem.intel.work_email || "");
     setCustomLinkedinNote(activeItem.intel.linkedin_note || "");
     setCustomLinkedinMessage(activeItem.intel.linkedin_message || "");
+  }
+
+  function handleRegenerateLinkedIn(company: string, contact: string, trigger: string) {
+    const pitch = synthesizeDefaultPitch(company, contact, trigger);
+    setCustomLinkedinNote(pitch.linkedinNote);
+    setCustomLinkedinMessage(pitch.linkedinMessage);
+    toast.success(`Generated fresh LinkedIn angle for ${company}.`);
   }
 
   function copyText(key: string, val: string) {
@@ -751,6 +758,21 @@ export default function OutreachStudioPage() {
                             Connection Request Note (under 300 characters)
                           </Label>
                           <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleRegenerateLinkedIn(
+                                  activeItem.intel.company_name,
+                                  activeItem.intel.contact_name,
+                                  activeItem.intel.buying_trigger,
+                                )
+                              }
+                              className="h-6 gap-1 text-[11px] text-sky-400 hover:text-sky-300"
+                            >
+                              <Sparkles className="size-3" />
+                              Regenerate
+                            </Button>
                             <span
                               className={cn(
                                 "text-[11px] font-mono",

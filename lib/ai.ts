@@ -1,6 +1,6 @@
 import dns from "node:dns";
 import { env, isGroqConfigured, isZaiConfigured } from "@/lib/env";
-import { sanitizeTriggerText } from "@/lib/intelligence";
+import { synthesizeDefaultPitch } from "@/lib/intelligence";
 
 try {
   dns.setDefaultResultOrder?.("ipv4first");
@@ -22,15 +22,11 @@ export interface Draft {
 }
 
 function fallbackDraft(lead: DraftLead): Draft {
-  const firstName = lead.person.split(/\s+/)[0] ?? lead.person;
-  const company = lead.company;
-  const cleanTrigger = sanitizeTriggerText(lead.trigger) || "scaling core operations";
-  const shortTrigger = cleanTrigger.split(/\s+/).slice(0, 6).join(" ").replace(/[.,;:]$/, "");
-
+  const pitch = synthesizeDefaultPitch(lead.company, lead.person, lead.trigger);
   return {
     id: lead.id,
-    subject: `Quick note on ${company}'s ${shortTrigger}`,
-    body: `Hi ${firstName},\n\nSaw ${company} is actively ${cleanTrigger}. Most founders I speak with find that hiring senior talent creates a 6-to-8 week lag that pushes quarterly release targets back.\n\nWe deploy pre-vetted senior pods ready to execute sprint objectives from Day 1—with zero recruitment overhead.\n\nOpen to a brief 4-minute chat this Thursday to compare notes?\n\nBest,`,
+    subject: pitch.emailSubject,
+    body: pitch.emailBody,
   };
 }
 

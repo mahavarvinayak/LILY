@@ -59,15 +59,28 @@ export function sanitizeTriggerText(text: string | null | undefined): string {
 
 export function synthesizeDefaultPitch(company: string, contactName: string, rawTrigger: string) {
   const firstName = contactName.split(/\s+/)[0] || "there";
-  const cleanTrigger = sanitizeTriggerText(rawTrigger) || "scaling core operations";
+  const cleanTrigger = sanitizeTriggerText(rawTrigger) || "expanding operations";
+
+  const isSalesOrBD = /\b(sales|business development|bde|bdr|sdr|client acquisition|marketing|lead gen)\b/i.test(cleanTrigger);
+
+  if (isSalesOrBD) {
+    const emailSubject = `Quick note: ${company}'s outbound pipeline`;
+    const emailBody = `Hi ${firstName},\n\nSaw ${company} is currently hiring for business development to scale client acquisition.\n\nMost agency founders tell us that hiring and training new BDEs takes 6 to 8 weeks before seeing consistent qualified calls with US/EU prospects.\n\nWe install an automated pipeline engine that delivers verified, high-intent client opportunities directly into your CRM every morning—without the hiring lag.\n\nOpen to a brief 5-minute chat this Thursday to see 3 sample opportunities for ${company}?\n\nBest,`;
+
+    const linkedinNote = `Hi ${firstName}, saw ${company} is expanding its business development team. I work with agency founders to help scale client acquisition with US/EU accounts. Would love to connect and exchange notes!`;
+
+    const linkedinMessage = `Hey ${firstName}, saw you're actively scaling your business development team at ${company}.\n\nUsually, getting new BDEs ramped up on outbound takes 60+ days before seeing booked calls.\n\nWe help agency founders automate lead intelligence and deliver verified client opportunities directly to your desk from day 1.\n\nOpen to a brief 5-minute chat on Thursday to compare notes?`;
+
+    return { emailSubject, emailBody, linkedinNote, linkedinMessage };
+  }
+
   const shortTrigger = cleanTrigger.split(/\s+/).slice(0, 6).join(" ").replace(/[.,;:]$/, "");
+  const emailSubject = `Engineering bandwidth for ${company}'s roadmap`;
+  const emailBody = `Hi ${firstName},\n\nSaw ${company} is actively recruiting for ${cleanTrigger}.\n\nFinding vetted senior talent usually creates a 6-to-8 week recruitment lag that pushes critical product milestones back into next quarter.\n\nWe provide dedicated, pre-vetted senior talent ready to plug in and ship from Day 1—with zero recruitment overhead.\n\nWorth a quick 4-minute chat this Thursday to compare bandwidth?\n\nBest,`;
 
-  const emailSubject = `Quick note on ${company}'s ${shortTrigger}`;
-  const emailBody = `Hi ${firstName},\n\nSaw ${company} is actively ${cleanTrigger}. Most founders I speak with find that hiring senior talent creates a 6-to-8 week lag that pushes quarterly release targets back.\n\nWe deploy pre-vetted senior pods ready to execute sprint objectives from Day 1—with zero recruitment overhead.\n\nOpen to a brief 4-minute chat this Thursday to compare notes?\n\nBest,`;
+  const linkedinNote = `Hi ${firstName}, noticed ${company} is expanding its team for ${shortTrigger}. We help leaders hit delivery milestones without the 8-week hiring lag. Open to connecting?`;
 
-  const linkedinNote = `Hi ${firstName}, noticed you're ${cleanTrigger} at ${company}. We help growth teams hit delivery milestones without the 8-week hiring lag. Open to connecting?`;
-
-  const linkedinMessage = `Hey ${firstName},\n\nSaw ${company} is actively ${cleanTrigger}.\n\nFounders in your space usually tell us standard hiring vendor cycles eat into sprint velocity and stall deliverables.\n\nWe provide dedicated, pre-vetted pods with instant deployment—no recruitment lag.\n\nWorth a brief 5-minute sync on Thursday to see if our bench matches your roadmap?`;
+  const linkedinMessage = `Hey ${firstName}, saw ${company} is actively recruiting for ${cleanTrigger}.\n\nMost founders tell us long hiring cycles stall sprint velocity and delay major release dates.\n\nWe plug in senior, pre-vetted talent within 72 hours so your roadmap stays on track.\n\nOpen to a quick 5-minute chat this Thursday to compare bandwidth?`;
 
   return { emailSubject, emailBody, linkedinNote, linkedinMessage };
 }
@@ -146,8 +159,14 @@ export function extractLeadIntelligence(
     jsonMeta.trigger_url ||
     "";
 
+  const isOldShortDm = Boolean(
+    opp.ai_icebreaker &&
+      opp.ai_icebreaker.length < 260 &&
+      /let us connect|open to connect/i.test(opp.ai_icebreaker),
+  );
+
   const aiIcebreaker =
-    opp.ai_icebreaker ||
+    (!isOldShortDm && opp.ai_icebreaker) ||
     jsonMeta.ai_icebreaker ||
     defaultPitch.emailBody;
 
@@ -157,6 +176,7 @@ export function extractLeadIntelligence(
     defaultPitch.emailSubject;
 
   const linkedinNote =
+    (isOldShortDm ? opp.ai_icebreaker : null) ||
     jsonMeta.linkedin_note ||
     defaultPitch.linkedinNote;
 
