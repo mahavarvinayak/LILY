@@ -51,18 +51,35 @@ import { initials, cn, nameFromEmail } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
-const nav = [
-  { label: "Assistant", href: "/dashboard", icon: MessageCircle },
-  { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
-  { label: "Opportunities", href: "/dashboard/opportunities", icon: Target },
-  { label: "Outreach Studio", href: "/dashboard/outreach", icon: Send },
-  { label: "Companies", href: "/dashboard/companies", icon: Building2 },
-  { label: "People", href: "/dashboard/people", icon: Users },
-  { label: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
-  { label: "Team", href: "/dashboard/team", icon: UserCheck },
-  { label: "Connectors", href: "/dashboard/connectors", icon: Plug },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+const navGroups = [
+  {
+    label: "Command",
+    items: [
+      { label: "Assistant", href: "/dashboard", icon: MessageCircle },
+      { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
+      { label: "Opportunities", href: "/dashboard/opportunities", icon: Target },
+      { label: "Outreach Studio", href: "/dashboard/outreach", icon: Send },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { label: "Companies", href: "/dashboard/companies", icon: Building2 },
+      { label: "People", href: "/dashboard/people", icon: Users },
+      { label: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
+      { label: "Team", href: "/dashboard/team", icon: UserCheck },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { label: "Connectors", href: "/dashboard/connectors", icon: Plug },
+      { label: "Settings", href: "/dashboard/settings", icon: Settings },
+    ],
+  },
 ];
+
+const nav = navGroups.flatMap((group) => group.items);
 
 function DashboardShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -132,38 +149,65 @@ function DashboardShell({ children }: { children: ReactNode }) {
           <LilyLogo />
         )}
       </div>
-      <p className="mb-3 px-3 text-[10px] uppercase tracking-[.2em] text-muted-foreground">
+      <p className="mb-2 px-3 text-[10px] uppercase tracking-[.2em] text-muted-foreground">
         {compact ? "·" : "Workspace"}
       </p>
-      <nav className="space-y-1">
-        {nav.map((n) => {
-          const active = pathname === n.href;
-          return (
-            <Link
-              key={n.href}
-              href={n.href}
-              title={n.label}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors hover:bg-primary/10 hover:text-primary",
-                active
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground",
-              )}
-            >
-              <n.icon className="size-[18px] shrink-0" />
-              {!compact && (
-                <>
-                  <span className="flex-1">{n.label}</span>
-                  {counts[n.href] !== undefined && (
-                    <span className="rounded-md bg-muted px-1.5 text-[10px] tabular-nums">
-                      {counts[n.href]}
-                    </span>
-                  )}
-                </>
-              )}
-            </Link>
-          );
-        })}
+      <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            {!compact && (
+              <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[.2em] text-muted-foreground/70">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((n) => {
+                const active = pathname === n.href;
+                const count = counts[n.href];
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    title={n.label}
+                    className={cn(
+                      "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors",
+                      active
+                        ? "bg-primary/12 font-semibold text-primary"
+                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                    )}
+                  >
+                    {active && (
+                      <span
+                        className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-primary"
+                        aria-hidden
+                      />
+                    )}
+                    <n.icon className="size-[17px] shrink-0" />
+                    {!compact && (
+                      <>
+                        <span className="flex-1">{n.label}</span>
+                        {count !== undefined && (
+                          <span
+                            className={cn(
+                              "rounded-md px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
+                              active
+                                ? "bg-primary/20 text-primary"
+                                : n.href === "/dashboard/outreach" && count > 0
+                                  ? "bg-amber-500/15 text-amber-300"
+                                  : "bg-white/5 text-muted-foreground",
+                            )}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
       {!compact && (
         <div className="mt-auto rounded-2xl border border-primary/20 bg-primary/5 p-4">
@@ -267,7 +311,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           </Button>
 
           <button
-            className="flex min-w-0 flex-1 items-center gap-3 text-left text-sm text-muted-foreground"
+            className="flex min-w-0 max-w-xl flex-1 items-center gap-3 rounded-xl border border-border-strong bg-surface/60 px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
             onClick={() => setSearchOpen(true)}
           >
             <Search className="size-4 shrink-0" />

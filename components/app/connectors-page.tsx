@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plug, CheckCircle2, Loader2, RefreshCw, Unlink, ShieldCheck } from "lucide-react";
 import { CONNECTOR_LOGOS } from "@/components/app/connector-logos";
 import { Header, Panel } from "@/components/app/workspace-ui";
+import { Pill } from "@/components/app/ui-kit";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -216,6 +218,9 @@ export function ConnectorsPage() {
     <>
       <div className="flex items-center justify-between">
         <Header
+          eyebrow="System · Connections"
+          icon={Plug}
+          tone="sky"
           title="Connectors"
           description="Connect your agency tools. LILY acts through them so outreach feels native."
         />
@@ -245,25 +250,27 @@ export function ConnectorsPage() {
           const isConnected = Boolean(activeMailbox);
 
           return (
-            <Panel key={item.slug} className="flex flex-col justify-between p-5">
+            <Panel
+              key={item.slug}
+              className={cn(
+                "flex flex-col justify-between p-5",
+                isConnected && "border-emerald-500/30",
+              )}
+            >
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border-strong bg-background">
                       {Logo ? <Logo /> : <Plug className="size-5 text-muted-foreground" />}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold text-foreground">{item.name}</h3>
-                        {item.comingSoon && (
-                          <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[9px] font-mono tracking-wider text-muted-foreground uppercase">
-                            Coming Soon
-                          </span>
-                        )}
+                        {item.comingSoon && <Pill tone="neutral">Coming soon</Pill>}
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{item.blurb}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.blurb}</p>
                       {isConnected && activeMailbox && (
-                        <p className="mt-2.5 inline-flex items-center gap-1.5 font-mono text-xs font-medium text-primary">
+                        <p className="mt-2.5 inline-flex items-center gap-1.5 font-mono text-xs font-medium text-emerald-300">
                           <span className="size-1.5 rounded-full bg-emerald-400" />
                           {activeMailbox.email}
                         </p>
@@ -272,14 +279,14 @@ export function ConnectorsPage() {
                   </div>
 
                   {isConnected && (
-                    <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                    <Pill tone="emerald" className="shrink-0">
                       <CheckCircle2 className="size-3" /> Connected
-                    </span>
+                    </Pill>
                   )}
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2 border-t border-border/50 pt-4">
+              <div className="mt-5 flex items-center justify-end gap-2 border-t border-border pt-4">
                 {item.comingSoon ? (
                   <Button variant="ghost" size="sm" disabled className="h-8 text-xs opacity-50 cursor-not-allowed">
                     Coming Soon

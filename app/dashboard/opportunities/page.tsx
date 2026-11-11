@@ -12,10 +12,14 @@ import {
   Copy,
   Check,
   Download,
+  Wallet,
+  Mail,
+  Radar,
+  Target,
 } from "lucide-react";
 import { api, useWorkspaceMutation } from "@/lib/workspace";
 import { STAGES, STAGE_META, type Stage, type OpportunityRecord } from "@/lib/types";
-import { formatInr, cn } from "@/lib/utils";
+import { formatInr, formatDate, cn } from "@/lib/utils";
 import { extractLeadIntelligence } from "@/lib/intelligence";
 import { export31FieldsToCsv } from "@/lib/export-csv";
 import {
@@ -41,6 +45,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { CompanyFavicon } from "@/components/app/company-favicon";
+import { Pill, StatTile, stageToneFor } from "@/components/app/ui-kit";
 
 const stages: Stage[] = [...STAGES, "Lost"];
 
@@ -59,6 +65,12 @@ function OpportunitiesContent() {
   const optimistic = useOptimistic();
 
   const selected = data.opportunities.find((o) => o.id === leadParam);
+  const pipelineValue = data.opportunities.reduce((sum, o) => sum + o.deal_value, 0);
+  const openDeals = data.opportunities.filter(
+    (o) => o.stage !== "Lost" && o.stage !== "Customer",
+  );
+  const verifiedForOutreach = data.opportunities.filter((o) => Boolean(o.person?.email)).length;
+  const newLeads = data.opportunities.filter((o) => o.stage === "New Lead").length;
 
   const move = (id: string, stage: Stage) => {
     const row = data.opportunities.find((o) => o.id === id);
@@ -83,11 +95,44 @@ function OpportunitiesContent() {
   return (
     <>
       <Header
+        eyebrow="Pipeline · Revenue board"
+        icon={Target}
+        tone="amber"
         title="Let opportunity bloom."
         description="From first signal to lasting partnership. Every meaningful conversation has a place."
         action={<CreateRecord kind="deal" />}
       />
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatTile
+          label="Pipeline value"
+          value={formatInr(pipelineValue, true)}
+          hint={`${data.opportunities.length} deals tracked`}
+          icon={Wallet}
+          tone="emerald"
+        />
+        <StatTile
+          label="Open deals"
+          value={openDeals.length}
+          hint="Excluding lost & won"
+          icon={Target}
+          tone="primary"
+        />
+        <StatTile
+          label="Ready for outreach"
+          value={verifiedForOutreach}
+          hint="Verified emails on file"
+          icon={Mail}
+          tone="sky"
+        />
+        <StatTile
+          label="New this drop"
+          value={newLeads}
+          hint="Arrived at 08:00 IST"
+          icon={Radar}
+          tone="amber"
+        />
+      </div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Input
           className="max-w-md"
           aria-label="Search opportunities"
@@ -95,25 +140,35 @@ function OpportunitiesContent() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            export31FieldsToCsv(
-              data.opportunities.map((opp) => ({
-                opp,
-                company: opp.company,
-                person: opp.person,
-              })),
-              "lily_pipeline_opportunities",
-            );
-            toast.success("Downloaded 31-field intelligence CSV.");
-          }}
-          className="gap-1.5"
-        >
-          <Download className="size-3.5" />
-          Export 31-Field CSV
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {data.opportunities.filter((o) =>
+              `${o.deal_name} ${o.company?.name || ""} ${o.buying_trigger}`
+                .toLowerCase()
+                .includes(q.toLowerCase()),
+            ).length}{" "}
+            deals match
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              export31FieldsToCsv(
+                data.opportunities.map((opp) => ({
+                  opp,
+                  company: opp.company,
+                  person: opp.person,
+                })),
+                "lily_pipeline_opportunities",
+              );
+              toast.success("Downloaded 31-field intelligence CSV.");
+            }}
+            className="gap-1.5"
+          >
+            <Download className="size-3.5" />
+            Export 31-Field CSV
+          </Button>
+        </div>
       </div>
       {!data.opportunities.length && (
         <div className="mb-6">
@@ -133,6 +188,7 @@ function OpportunitiesContent() {
                 .toLowerCase()
                 .includes(q.toLowerCase()),
           );
+          const stageValue = rows.reduce((sum, row) => sum + row.deal_value, 0);
           return (
             <section
               key={stage}
@@ -149,14 +205,23 @@ function OpportunitiesContent() {
                 setOver(null);
               }}
               className={cn(
-                "min-h-96 w-[280px] shrink-0 snap-start rounded-2xl border border-border bg-surface/50 p-3",
-                over === stage && "border-primary bg-primary/5",
+                "min-h-96 w-[290px] shrink-0 snap-start rounded-2xl border border-border-strong bg-surface/50 p-3",
+                over === stage && "border-primary bg-primary/[0.07]",
               )}
             >
-              <div className="mb-4 flex items-center gap-2 px-1 py-2">
-                <span className={cn("size-2 rounded-full", STAGE_META[stage].dot)} />
-                <h2 className="text-sm font-medium">{STAGE_META[stage].short}</h2>
-                <span className="ml-auto text-xs text-muted-foreground">{rows.length}</span>
+              <div className="mb-3 border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <span className={cn("size-2 rounded-full", STAGE_META[stage].dot)} />
+                  <h2 className="text-[13px] font-semibold text-foreground">
+                    {STAGE_META[stage].short}
+                  </h2>
+                  <span className="ml-auto rounded-md bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    {rows.length}
+                  </span>
+                </div>
+                <p className="mt-1.5 pl-4 font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {formatInr(stageValue, true)}
+                </p>
               </div>
               {rows.map((o) => (
                 <motion.div key={o.id} layout={!reduced} transition={{ duration: 0.2 }}>
@@ -172,7 +237,7 @@ function OpportunitiesContent() {
                       setOver(null);
                     }}
                     className={cn(
-                      "mb-3 rounded-xl border border-border bg-card p-4 shadow-soft",
+                      "mb-3 rounded-xl border border-border-strong bg-card p-4 shadow-soft transition-colors hover:border-primary/40",
                       dragging === o.id && "opacity-50",
                     )}
                   >
@@ -180,20 +245,38 @@ function OpportunitiesContent() {
                       className="w-full text-left"
                       onClick={() => openDossier(o.id)}
                     >
-                      <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {o.company?.name || "Opportunity"}
-                      </p>
-                      <h3 className="font-display text-xl leading-snug">{o.deal_name}</h3>
-                      <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      <div className="mb-2 flex items-center gap-2">
+                        <CompanyFavicon
+                          domain={o.company?.domain}
+                          website={o.company?.website}
+                          name={o.company?.name || o.deal_name}
+                          size={20}
+                        />
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
+                          {o.company?.name || "Opportunity"}
+                        </p>
+                        <Pill tone={stageToneFor(o.stage)} className="ml-auto shrink-0">
+                          {STAGE_META[o.stage].short}
+                        </Pill>
+                      </div>
+                      <h3 className="font-display text-lg leading-snug">{o.deal_name}</h3>
+                      <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
                         {o.buying_trigger || "Your next conversation starts here."}
                       </p>
-                      <p className="mt-4 text-sm text-primary">{formatInr(o.deal_value)}</p>
+                      <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
+                        <span className="text-sm font-semibold tabular-nums text-primary">
+                          {formatInr(o.deal_value, true)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDate(o.scheduled_at)}
+                        </span>
+                      </div>
                     </button>
                     <select
                       aria-label={`Move ${o.deal_name} to stage`}
                       value={o.stage}
                       onChange={(e) => move(o.id, e.target.value as Stage)}
-                      className={cn(fieldClass, "mt-4 text-xs")}
+                      className={cn(fieldClass, "mt-3 h-8 text-xs")}
                     >
                       {stages.map((s) => (
                         <option key={s}>{s}</option>

@@ -13,6 +13,8 @@ import {
   Download,
   Linkedin,
   CheckCircle2,
+  ShieldCheck,
+  Mail,
 } from "lucide-react";
 import {
   Header,
@@ -21,6 +23,7 @@ import {
   useWorkspace,
   useWrite,
 } from "@/components/app/workspace-ui";
+import { StatTile, Pill, SectionHeading } from "@/components/app/ui-kit";
 import { CompanyFavicon } from "@/components/app/company-favicon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { extractLeadIntelligence } from "@/lib/intelligence";
 import { export31FieldsToCsv } from "@/lib/export-csv";
 import { api, workspaceKey } from "@/lib/workspace";
-import { cn } from "@/lib/utils";
+import { cn, formatInr } from "@/lib/utils";
 
 export default function OutreachStudioPage() {
   const d = useWorkspace();
@@ -180,10 +183,17 @@ export default function OutreachStudioPage() {
 
   const dispatchedCount = verifiedLeads.filter((item) => item.opp.outreach_dispatched).length;
   const readyCount = verifiedLeads.filter((item) => !item.opp.outreach_dispatched).length;
+  const queueValue = verifiedLeads.reduce((sum, item) => sum + item.opp.deal_value, 0);
+  const dispatchedPct = verifiedLeads.length
+    ? Math.round((dispatchedCount / verifiedLeads.length) * 100)
+    : 0;
 
   return (
     <>
       <Header
+        eyebrow="Outreach · Human in the loop"
+        icon={Send}
+        tone="emerald"
         title="Outreach Studio"
         description="Human-in-the-loop review and 1-click dispatch. Only verified corporate emails enter this queue."
         action={
@@ -220,23 +230,35 @@ export default function OutreachStudioPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Panel className="p-4">
-          <p className="text-xs text-muted-foreground">Verified Prospects</p>
-          <p className="mt-2 font-display text-2xl text-foreground">{verifiedLeads.length}</p>
-        </Panel>
-        <Panel className="p-4">
-          <p className="text-xs text-muted-foreground">Ready to Send</p>
-          <p className="mt-2 font-display text-2xl text-primary">{readyCount}</p>
-        </Panel>
-        <Panel className="p-4">
-          <p className="text-xs text-muted-foreground">Dispatched Outreaches</p>
-          <p className="mt-2 font-display text-2xl text-emerald-400">{dispatchedCount}</p>
-        </Panel>
-        <Panel className="p-4">
-          <p className="text-xs text-muted-foreground">Dispatch Engine</p>
-          <p className="mt-2 text-sm font-semibold text-foreground">Custom SMTP & Resend</p>
-        </Panel>
+      <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatTile
+          label="Verified prospects"
+          value={verifiedLeads.length}
+          hint="Corporate emails verified"
+          icon={ShieldCheck}
+          tone="sky"
+        />
+        <StatTile
+          label="Ready to send"
+          value={readyCount}
+          hint="Awaiting your approval"
+          icon={Send}
+          tone="primary"
+        />
+        <StatTile
+          label="Dispatched"
+          value={dispatchedCount}
+          hint={`${dispatchedPct}% of the queue`}
+          icon={CheckCircle2}
+          tone="emerald"
+        />
+        <StatTile
+          label="Queue value"
+          value={formatInr(queueValue, true)}
+          hint="Verified pipeline in review"
+          icon={Download}
+          tone="amber"
+        />
       </div>
 
       {!verifiedLeads.length ? (
@@ -254,83 +276,91 @@ export default function OutreachStudioPage() {
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-5 space-y-4">
-            <Panel className="p-4">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  Prospect Queue
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={isDraftingAll}
-                  onClick={handleDraftAllWithAi}
-                  className="h-7 gap-1 text-[11px] text-primary"
-                >
-                  <Sparkles className="size-3" />
-                  {isDraftingAll ? "Drafting..." : "Draft All AI Pitches"}
-                </Button>
-              </div>
-
-              <Input
-                placeholder="Filter by company, name, email..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                className="mb-3 text-xs"
+          <div className="lg:col-span-5">
+            <Panel variant="flush">
+              <SectionHeading
+                eyebrow="Prospect queue"
+                title="Verified decision makers"
+                meta={`${filteredLeads.length} in view`}
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isDraftingAll}
+                    onClick={handleDraftAllWithAi}
+                    className="h-8 gap-1 text-[11px] text-primary"
+                  >
+                    <Sparkles className="size-3" />
+                    {isDraftingAll ? "Drafting…" : "Draft all with AI"}
+                  </Button>
+                }
               />
-
-              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              <div className="border-b border-border p-3">
+                <Input
+                  placeholder="Filter by company, name or email…"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+              <div className="max-h-[640px] space-y-2 overflow-y-auto p-3">
+                {!filteredLeads.length && (
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs leading-5 text-muted-foreground">
+                    No verified prospects match “{q}”. Try a company name or email.
+                  </div>
+                )}
                 {filteredLeads.map(({ opp, intel }) => {
                   const isSelected = activeItem?.opp.id === opp.id;
                   const isDispatched = opp.outreach_dispatched;
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={opp.id}
                       onClick={() => setSelectedId(opp.id)}
                       className={cn(
-                        "cursor-pointer rounded-xl border p-3 transition-colors",
+                        "w-full rounded-xl border-y border-r border-l-2 p-3 text-left transition-colors",
                         isSelected
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border bg-card hover:border-primary/40",
+                          ? "border-l-primary border-y-primary/40 border-r-primary/40 bg-primary/10"
+                          : "border-l-transparent border-y-border border-r-border bg-surface/50 hover:border-l-primary/60 hover:bg-surface",
                       )}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <CompanyFavicon
-                            domain={opp.company?.domain}
-                            website={opp.company?.website}
-                            name={intel.company_name}
-                            size={24}
-                          />
-                          <div>
-                            <p className="font-medium text-xs text-foreground">
+                      <div className="flex items-start gap-2.5">
+                        <CompanyFavicon
+                          domain={opp.company?.domain}
+                          website={opp.company?.website}
+                          name={intel.company_name}
+                          size={30}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-[13px] font-semibold text-foreground">
                               {intel.company_name}
                             </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {intel.contact_name} · {intel.contact_title}
-                            </p>
+                            {isDispatched ? (
+                              <Pill tone="emerald">
+                                <CheckCircle2 className="size-3" />
+                                Sent
+                              </Pill>
+                            ) : (
+                              <Pill tone="primary">Ready</Pill>
+                            )}
                           </div>
+                          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                            {intel.contact_name} · {intel.contact_title}
+                          </p>
                         </div>
-
-                        {isDispatched ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-medium text-emerald-400 shrink-0">
-                            <CheckCircle2 className="size-2.5" /> Sent
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary shrink-0">
-                            Ready
-                          </span>
-                        )}
                       </div>
-
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2">
-                        <span className="font-mono truncate max-w-[200px]">
-                          {intel.work_email}
-                        </span>
-                        <span>{intel.trigger_age || "Active Signal"}</span>
+                      {intel.buying_trigger && (
+                        <p className="mt-2 line-clamp-1 text-[11px] text-primary/90">
+                          {intel.buying_trigger}
+                        </p>
+                      )}
+                      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
+                        <span className="truncate font-mono">{intel.work_email}</span>
+                        <span className="shrink-0">{intel.trigger_age || "Active signal"}</span>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -339,123 +369,155 @@ export default function OutreachStudioPage() {
 
           <div className="lg:col-span-7">
             {activeItem ? (
-              <Panel className="space-y-5 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-                  <div className="flex items-center gap-3">
+              <Panel variant="flush">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+                  <div className="flex items-start gap-3">
                     <CompanyFavicon
                       domain={activeItem.opp.company?.domain}
                       website={activeItem.opp.company?.website}
                       name={activeItem.intel.company_name}
-                      size={36}
+                      size={40}
                     />
                     <div>
-                      <h2 className="font-display text-lg text-foreground">
-                        {activeItem.intel.contact_name}
-                      </h2>
-                      <p className="text-xs text-muted-foreground">
-                        {activeItem.intel.contact_title} at {activeItem.intel.company_name}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-display text-xl leading-tight text-foreground">
+                          {activeItem.intel.contact_name}
+                        </h2>
+                        <Pill tone="emerald" dot>
+                          Email verified
+                        </Pill>
+                        {activeItem.opp.outreach_dispatched && (
+                          <Pill tone="sky">
+                            <CheckCircle2 className="size-3" />
+                            Dispatched
+                          </Pill>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {activeItem.intel.contact_title} at{" "}
+                        <span className="font-medium text-foreground">
+                          {activeItem.intel.company_name}
+                        </span>
                       </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                          <Mail className="size-3" />
+                          {activeItem.intel.work_email}
+                        </span>
+                        {activeItem.intel.linkedin_url && (
+                          <a
+                            href={activeItem.intel.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"
+                          >
+                            <Linkedin className="size-3" />
+                            View LinkedIn profile
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    {activeItem.intel.linkedin_url && (
+                <div className="space-y-5 p-5">
+                  <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-amber-300">
+                        <Sparkles className="size-3.5" />
+                        Commercial buying signal
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {activeItem.intel.intent_level && (
+                          <Pill tone="rose">{activeItem.intel.intent_level}</Pill>
+                        )}
+                        {activeItem.intel.trigger_age && (
+                          <Pill tone="neutral">{activeItem.intel.trigger_age}</Pill>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-foreground">
+                      {activeItem.intel.buying_trigger || "No buying trigger recorded yet."}
+                    </p>
+                    {activeItem.intel.trigger_url && (
                       <a
-                        href={activeItem.intel.linkedin_url}
+                        href={activeItem.intel.trigger_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground hover:text-sky-400"
+                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 hover:underline"
                       >
-                        <Linkedin className="size-3 text-sky-400" />
-                        LinkedIn
+                        Audit proof trail <ExternalLink className="size-3" />
                       </a>
                     )}
-                    {activeItem.opp.outreach_dispatched && (
-                      <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-400">
-                        <CheckCircle2 className="size-3.5" /> Dispatched
-                      </span>
-                    )}
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold uppercase tracking-wider text-primary text-[10px]">
-                      Commercial Buying Signal
+                  <div className="space-y-4">
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <Label htmlFor="pitch-subject" className="text-xs font-semibold text-foreground">
+                          Subject line
+                        </Label>
+                        <button
+                          type="button"
+                          onClick={() => copyText("pitch-subject", customSubject)}
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                        >
+                          {copiedKey === "pitch-subject" ? (
+                            <Check className="size-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="size-3" />
+                          )}
+                          Copy
+                        </button>
+                      </div>
+                      <Input
+                        id="pitch-subject"
+                        value={customSubject}
+                        onChange={(e) => setCustomSubject(e.target.value)}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <Label htmlFor="pitch-body" className="text-xs font-semibold text-foreground">
+                          Personalized outreach body
+                        </Label>
+                        <button
+                          type="button"
+                          onClick={() => copyText("pitch-body", customBody)}
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                        >
+                          {copiedKey === "pitch-body" ? (
+                            <Check className="size-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="size-3" />
+                          )}
+                          Copy
+                        </button>
+                      </div>
+                      <textarea
+                        id="pitch-body"
+                        rows={8}
+                        value={customBody}
+                        onChange={(e) => setCustomBody(e.target.value)}
+                        className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 rounded-lg border border-border bg-surface/60 px-3 py-2.5 text-[11px] leading-4 text-muted-foreground">
+                    <Mail className="mt-0.5 size-3.5 shrink-0" />
+                    <span>
+                      Sends through your connected Custom SMTP or Composio mailbox.{" "}
+                      <Link href="/dashboard/connectors" className="font-semibold text-primary hover:underline">
+                        Manage connectors
+                      </Link>
                     </span>
-                    <span className="text-muted-foreground">{activeItem.intel.trigger_age}</span>
-                  </div>
-                  <p className="text-foreground leading-relaxed">
-                    {activeItem.intel.buying_trigger}
-                  </p>
-                  {activeItem.intel.trigger_url && (
-                    <a
-                      href={activeItem.intel.trigger_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-                    >
-                      Audit Proof Trail <ExternalLink className="size-2.5" />
-                    </a>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label htmlFor="pitch-subject" className="text-xs font-semibold">
-                        Subject Line
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => copyText("pitch-subject", customSubject)}
-                        className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1"
-                      >
-                        {copiedKey === "pitch-subject" ? (
-                          <Check className="size-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="size-3" />
-                        )}
-                        Copy
-                      </button>
-                    </div>
-                    <Input
-                      id="pitch-subject"
-                      value={customSubject}
-                      onChange={(e) => setCustomSubject(e.target.value)}
-                      className="text-xs font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <Label htmlFor="pitch-body" className="text-xs font-semibold">
-                        Personalized Outreach Body
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => copyText("pitch-body", customBody)}
-                        className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1"
-                      >
-                        {copiedKey === "pitch-body" ? (
-                          <Check className="size-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="size-3" />
-                        )}
-                        Copy
-                      </button>
-                    </div>
-                    <textarea
-                      id="pitch-body"
-                      rows={8}
-                      value={customBody}
-                      onChange={(e) => setCustomBody(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-surface p-3 text-xs leading-relaxed text-foreground focus:border-primary focus:outline-none"
-                    />
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/40 px-5 py-4">
                   <Button
                     variant="outline"
                     size="sm"
@@ -469,27 +531,28 @@ export default function OutreachStudioPage() {
                     }
                     className="text-xs"
                   >
-                    {saveDraft.isPending ? "Saving..." : "Save Custom Angles"}
+                    {saveDraft.isPending ? "Saving…" : "Save custom angles"}
                   </Button>
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      disabled={isSending}
-                      onClick={() =>
-                        handleSendSingle(
-                          activeItem.opp.id,
-                          activeItem.intel.work_email,
-                          customSubject,
-                          customBody,
-                        )
-                      }
-                      className="gap-1.5 text-xs"
-                    >
-                      <Send className="size-3.5" />
-                      {isSending ? "Dispatching..." : activeItem.opp.outreach_dispatched ? "Resend Outreach" : "Approve & Send Now"}
-                    </Button>
-                  </div>
+                  <Button
+                    disabled={isSending}
+                    onClick={() =>
+                      handleSendSingle(
+                        activeItem.opp.id,
+                        activeItem.intel.work_email,
+                        customSubject,
+                        customBody,
+                      )
+                    }
+                    className="h-10 gap-2 px-5 text-sm"
+                  >
+                    <Send className="size-4" />
+                    {isSending
+                      ? "Dispatching…"
+                      : activeItem.opp.outreach_dispatched
+                        ? "Resend outreach"
+                        : "Approve & send now"}
+                  </Button>
                 </div>
               </Panel>
             ) : null}

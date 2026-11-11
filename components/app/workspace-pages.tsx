@@ -12,6 +12,13 @@ import {
   Check,
   Linkedin,
   Send,
+  Search,
+  MapPin,
+  Target,
+  Radar,
+  Wallet,
+  CheckSquare,
+  Settings,
 } from "lucide-react";
 import {
   Sheet,
@@ -33,7 +40,7 @@ import { Button } from "@/components/ui/button";
 import { api, useWorkspaceMutation } from "@/lib/workspace";
 import { STAGES, STAGE_META, type Task } from "@/lib/types";
 import { parseIcpConfig } from "@/lib/icp";
-import { formatInr, formatDate, cn, nameFromEmail } from "@/lib/utils";
+import { formatInr, formatDate, cn, nameFromEmail, initials } from "@/lib/utils";
 import {
   Header,
   Panel,
@@ -47,6 +54,24 @@ import {
   Field,
   fieldClass,
 } from "./workspace-ui";
+import {
+  Pill,
+  StatTile,
+  SectionHeading,
+  TierPill,
+  PriorityPill,
+  stageToneFor,
+  tableClasses,
+  type Tone,
+} from "./ui-kit";
+
+function intentTone(intent?: string | null): Tone {
+  const value = (intent || "").toLowerCase();
+  if (value.includes("high") || value.includes("active")) return "rose";
+  if (value.includes("expansion") || value.includes("medium")) return "amber";
+  return "neutral";
+}
+
 function Counter({ value, currency = false }: { value: number; currency?: boolean | undefined }) {
   const ref = useRef<HTMLSpanElement>(null);
   const reduced = useReducedMotion();
@@ -75,14 +100,17 @@ export function HomePage() {
   return (
     <>
       <Header
+        eyebrow="This morning · Command overview"
+        icon={Target}
+        tone="primary"
         title={`Welcome back, ${nameFromEmail(d.profile.contact_email) || d.profile.agency_name}.`}
         description="A little clarity. A lot of possibility. Here’s where your next chapter begins."
       />
-      <Panel className="relative mb-6 flex flex-wrap items-center justify-between gap-6 overflow-hidden border-primary/25 bg-primary/5">
+      <Panel className="relative mb-6 flex flex-wrap items-center justify-between gap-6 overflow-hidden border-primary/30 bg-primary/5">
         <Image src={moonArt} alt="" fill sizes="(min-width: 768px) 60vw, 100vw" className="pointer-events-none -z-10 object-cover opacity-40 animate-[hero-zoom_30s_ease-in-out_infinite_alternate]" />
         <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-background via-background/80 to-transparent" />
         <div className="relative">
-          <p className="text-xs uppercase tracking-widest text-primary">The morning ritual</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-primary">The morning ritual</p>
           <h2 className="mt-2 font-display text-2xl">Fresh signals. At first light.</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Your next lead drop · 08:00 IST · up to {d.profile.daily_lead_quota} leads
@@ -93,101 +121,148 @@ export function HomePage() {
         </div>
       </Panel>
       <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {[
-          {
-            label: "Open pipeline",
-            value: open.reduce((s, o) => s + o.deal_value, 0),
-            currency: true,
-          },
-          { label: "Opportunities", value: d.opportunities.length },
-          { label: "Companies", value: d.companies.length },
-          { label: "Tasks to do", value: d.tasks.filter((t) => !t.completed).length },
-        ].map((k, i) => (
-          <Panel key={k.label} className="animate-[rise_.6s_ease-out_both] transition-transform duration-300 hover:-translate-y-1 hover:border-primary/40" style={{ animationDelay: `${i * 80}ms` }}>
-            <p className="text-xs text-muted-foreground">{k.label}</p>
-            <p className="mt-3 font-display text-3xl">
-              <Counter value={k.value} currency={k.currency} />
-            </p>
-          </Panel>
-        ))}
+        <StatTile
+          label="Open pipeline"
+          value={<Counter value={open.reduce((s, o) => s + o.deal_value, 0)} currency />}
+          hint={`${open.length} active deals`}
+          icon={Wallet}
+          tone="emerald"
+        />
+        <StatTile
+          label="Opportunities"
+          value={<Counter value={d.opportunities.length} />}
+          hint={`${d.opportunities.filter((o) => o.stage === "New Lead").length} awaiting triage`}
+          icon={Target}
+          tone="primary"
+        />
+        <StatTile
+          label="Companies"
+          value={<Counter value={d.companies.length} />}
+          hint={`${d.people.length} decision makers`}
+          icon={Building2}
+          tone="sky"
+        />
+        <StatTile
+          label="Tasks to do"
+          value={<Counter value={d.tasks.filter((t) => !t.completed).length} />}
+          hint={`${tasks.length} due today`}
+          icon={CheckSquare}
+          tone="amber"
+        />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel>
-          <h2 className="mb-6 font-display text-2xl">A pipeline taking shape</h2>
-          {STAGES.map((s) => {
-            const rows = d.opportunities.filter((o) => o.stage === s);
-            return (
-              <div key={s} className="mb-5">
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className={STAGE_META[s].tone}>{s}</span>
-                  <span className="text-muted-foreground">
-                    {rows.length} ·{" "}
-                    {formatInr(
-                      rows.reduce((a, o) => a + o.deal_value, 0),
-                      true,
-                    )}
-                  </span>
+        <Panel variant="flush">
+          <SectionHeading
+            eyebrow="Revenue board"
+            title="A pipeline taking shape"
+            meta={`${d.opportunities.length} deals`}
+            action={
+              <Link href="/dashboard/opportunities" className="text-xs font-semibold text-primary hover:underline">
+                Open board →
+              </Link>
+            }
+          />
+          <div className="p-5">
+            {STAGES.map((s) => {
+              const rows = d.opportunities.filter((o) => o.stage === s);
+              return (
+                <div key={s} className="mb-4 last:mb-0">
+                  <div className="mb-2 flex items-baseline justify-between gap-3">
+                    <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+                      <span className={cn("size-2 rounded-full", STAGE_META[s].dot)} />
+                      {s}
+                      <span className="rounded-md bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        {rows.length}
+                      </span>
+                    </span>
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {formatInr(
+                        rows.reduce((a, o) => a + o.deal_value, 0),
+                        true,
+                      )}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                    <motion.div
+                      initial={false}
+                      animate={{
+                        width: `${d.opportunities.length ? (rows.length / d.opportunities.length) * 100 : 0}%`,
+                      }}
+                      className={cn("h-full rounded-full", STAGE_META[s].dot)}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <motion.div
-                    initial={false}
-                    animate={{
-                      width: `${d.opportunities.length ? (rows.length / d.opportunities.length) * 100 : 0}%`,
-                    }}
-                    className={cn("h-full rounded-full", STAGE_META[s].dot)}
-                  />
-                </div>
-              </div>
-            );
-          })}
-          <Link href="/dashboard/opportunities" className="text-sm text-primary">
-            Open pipeline →
-          </Link>
-        </Panel>
-        <Panel>
-          <h2 className="mb-5 font-display text-2xl">Today, with intention</h2>
-          {tasks.length ? (
-            tasks.map((t) => (
-              <div key={t.id} className="border-b border-border py-3 text-sm">
-                {t.title}
-                <span className="ml-2 text-xs text-muted-foreground">{t.priority}</span>
-              </div>
-            ))
-          ) : (
-            <Empty
-              title="A little breathing room"
-              description="No tasks due today. Make space for your next meaningful conversation."
-              action={<CreateRecord kind="task" />}
-            />
-          )}
-        </Panel>
-        <Panel className="lg:col-span-2">
-          <div className="mb-5 flex justify-between">
-            <h2 className="font-display text-2xl">Fresh from the valley</h2>
-            <CreateRecord kind="deal" />
+              );
+            })}
           </div>
-          {d.opportunities.length ? (
-            <div className="grid gap-3 md:grid-cols-3">
-              {d.opportunities.slice(0, 6).map((o) => (
-                <Link
-                  key={o.id}
-                  href={`/dashboard/opportunities?lead=${o.id}`}
-                  className="rounded-xl border border-border p-4 transition-colors hover:border-primary/40"
+        </Panel>
+        <Panel variant="flush">
+          <SectionHeading
+            eyebrow="Execution"
+            title="Today, with intention"
+            meta={`${tasks.length} due today`}
+          />
+          <div className="space-y-2 p-5">
+            {tasks.length ? (
+              tasks.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/50 px-3.5 py-3"
                 >
-                  <p className="text-xs text-primary">{o.stage}</p>
-                  <h3 className="my-2 font-display text-xl">{o.deal_name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {o.company?.name || "Independent opportunity"} · {formatInr(o.deal_value)}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <Empty
-              title="Your first opportunity is waiting"
-              description="Add a deal now, or return when your first verified leads arrive."
-            />
-          )}
+                  <span className="text-[13px] leading-5 text-foreground">{t.title}</span>
+                  <PriorityPill priority={t.priority} />
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-border-strong p-6 text-center">
+                <p className="text-sm text-foreground">A little breathing room</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No tasks due today. Make space for your next meaningful conversation.
+                </p>
+                <div className="mt-4 flex justify-center">
+                  <CreateRecord kind="task" />
+                </div>
+              </div>
+            )}
+          </div>
+        </Panel>
+        <Panel variant="flush" className="lg:col-span-2">
+          <SectionHeading
+            eyebrow="Fresh from the valley"
+            title="Latest arrivals"
+            meta={`${d.opportunities.length} total`}
+            action={<CreateRecord kind="deal" />}
+          />
+          <div className="p-5">
+            {d.opportunities.length ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                {d.opportunities.slice(0, 6).map((o) => (
+                  <Link
+                    key={o.id}
+                    href={`/dashboard/opportunities?lead=${o.id}`}
+                    className="group rounded-xl border border-border-strong bg-surface/60 p-4 transition-colors hover:border-primary/50 hover:bg-primary/5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <Pill tone={stageToneFor(o.stage)}>{o.stage}</Pill>
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {formatInr(o.deal_value, true)}
+                      </span>
+                    </div>
+                    <h3 className="my-2.5 font-display text-xl leading-snug">{o.deal_name}</h3>
+                    <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                      {o.company?.name || "Independent opportunity"}
+                      {o.buying_trigger ? ` · ${o.buying_trigger}` : ""}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <Empty
+                title="Your first opportunity is waiting"
+                description="Add a deal now, or return when your first verified leads arrive."
+              />
+            )}
+          </div>
         </Panel>
       </div>
     </>
@@ -219,7 +294,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
     return {
       id: c.id,
       name: c.name,
-      domain: c.domain || c.location || "Company",
+      domain: c.domain || null,
       location: c.location || "—",
       tech_stack: c.tech_stack || [],
       website: c.website,
@@ -296,9 +371,18 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
           : null)
       : null;
 
+  const verifiedEmailCount = peopleRows.filter((p) => Boolean(p.email)).length;
+  const threadedAccounts = companyRows.filter((c) => c.contacts.length > 1).length;
+  const signalCount = companyRows.filter((c) => Boolean(c.intel?.buying_trigger)).length;
+  const pipelineValue = d.opportunities.reduce((sum, o) => sum + o.deal_value, 0);
+  const totalRows = kind === "companies" ? filteredCompanies.length : filteredPeople.length;
+
   return (
     <>
       <Header
+        eyebrow={kind === "companies" ? "Accounts · Verified intelligence" : "Contacts · Decision makers"}
+        icon={kind === "companies" ? Building2 : Users}
+        tone={kind === "companies" ? "sky" : "violet"}
         title={kind === "companies" ? "Companies" : "People"}
         description={
           kind === "companies"
@@ -307,94 +391,144 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
         }
         action={<CreateRecord kind={kind === "companies" ? "company" : "person"} />}
       />
-      <Panel>
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-1 items-center gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatTile
+          label="Accounts"
+          value={d.companies.length}
+          hint={`${threadedAccounts} multi-threaded`}
+          icon={Building2}
+          tone="primary"
+        />
+        <StatTile
+          label="Decision makers"
+          value={d.people.length}
+          hint={`${verifiedEmailCount} with verified email`}
+          icon={Users}
+          tone="sky"
+        />
+        <StatTile
+          label="Active signals"
+          value={signalCount}
+          hint="Buying triggers live"
+          icon={Radar}
+          tone="amber"
+        />
+        <StatTile
+          label="Open pipeline"
+          value={formatInr(pipelineValue, true)}
+          hint={`${d.opportunities.length} opportunities`}
+          icon={Target}
+          tone="emerald"
+        />
+      </div>
+      {kind === "people" && verifiedEmailCount > 0 && (
+        <div className="mb-4">
+          <Pill tone="emerald" dot>
+            {verifiedEmailCount} contacts are ready for Outreach Studio
+          </Pill>
+        </div>
+      )}
+      <Panel variant="flush">
+        <SectionHeading
+          eyebrow={kind === "companies" ? "Account directory" : "People directory"}
+          title={kind === "companies" ? "Accounts ranked by buying signal" : "Decision makers with direct channels"}
+          meta={`${totalRows} of ${kind === "companies" ? companyRows.length : peopleRows.length} records`}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (kind === "companies") {
+                  export31FieldsToCsv(
+                    companyRows.map((c) => ({
+                      opp: c.opportunity,
+                      company: c.rawCompany,
+                    })),
+                    "lily_companies_directory",
+                  );
+                } else {
+                  export31FieldsToCsv(
+                    peopleRows.map((p) => ({
+                      opp: p.opportunity,
+                      company: p.company,
+                      person: p.rawPerson,
+                    })),
+                    "lily_people_directory",
+                  );
+                }
+                toast.success("Downloaded 31-field intelligence CSV.");
+              }}
+              className="gap-1.5"
+            >
+              <Download className="size-3.5" />
+              Export 31-Field CSV
+            </Button>
+          }
+        />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
+          <div className="relative w-full max-w-sm">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
             <Input
               aria-label={`Search ${kind}`}
-              placeholder={`Search ${kind}…`}
+              placeholder={`Search ${kind}, leaders or signals…`}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="max-w-sm"
+              className="pl-9"
             />
-            <Button variant="outline" size="sm" onClick={() => setAsc((v) => !v)}>
-              Name {asc ? "↑" : "↓"}
-            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (kind === "companies") {
-                export31FieldsToCsv(
-                  companyRows.map((c) => ({
-                    opp: c.opportunity,
-                    company: c.rawCompany,
-                  })),
-                  "lily_companies_directory",
-                );
-              } else {
-                export31FieldsToCsv(
-                  peopleRows.map((p) => ({
-                    opp: p.opportunity,
-                    company: p.company,
-                    person: p.rawPerson,
-                  })),
-                  "lily_people_directory",
-                );
-              }
-              toast.success("Downloaded 31-field intelligence CSV.");
-            }}
-            className="gap-1.5"
-          >
-            <Download className="size-3.5" />
-            Export 31-Field CSV
+          <Button variant="outline" size="sm" onClick={() => setAsc((v) => !v)}>
+            Name {asc ? "↑" : "↓"}
           </Button>
         </div>
 
         {kind === "companies" ? (
           filteredCompanies.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-left text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr className="border-b border-border">
-                    <th className="p-3">Organization</th>
-                    <th className="p-3">Vertical & Scale</th>
-                    <th className="p-3">Headquarters</th>
-                    <th className="p-3">Decision Makers</th>
-                    <th className="p-3">Active Pipeline</th>
-                    <th className="p-3 text-right">Actions</th>
+              <table className={tableClasses.table}>
+                <thead>
+                  <tr>
+                    <th className={cn(tableClasses.th, "w-[26%]")}>Account</th>
+                    <th className={cn(tableClasses.th, "w-[23%]")}>Buying signal</th>
+                    <th className={cn(tableClasses.th, "w-[15%]")}>Firmographics</th>
+                    <th className={cn(tableClasses.th, "w-[23%]")}>Decision makers</th>
+                    <th className={cn(tableClasses.th, "w-[13%]")}>Pipeline</th>
+                    <th className={cn(tableClasses.th, "text-right")}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCompanies.map((c) => (
-                    <tr
-                      key={c.id}
-                      className="border-t border-border transition-colors hover:bg-muted/20"
-                    >
-                      <td className="p-3">
-                        <div className="flex items-center gap-3">
+                    <tr key={c.id} className={tableClasses.row}>
+                      <td
+                        className={cn(
+                          tableClasses.td,
+                          "border-l-2 border-l-transparent transition-colors group-hover:border-l-primary/70",
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
                           <CompanyFavicon
                             domain={c.domain}
                             website={c.website}
                             name={c.name}
-                            size={36}
+                            size={40}
                           />
-                          <div>
+                          <div className="min-w-0">
                             <button
                               type="button"
                               onClick={() => setInspectId(c.id)}
-                              className="text-left font-medium text-foreground hover:text-primary hover:underline"
+                              className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-primary hover:underline"
                             >
                               {c.name}
                             </button>
-                            <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                               {c.website && (
                                 <a
                                   href={c.website}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1 hover:text-primary"
+                                  className="inline-flex items-center gap-1 font-mono hover:text-primary"
                                 >
                                   {c.website.replace(/^https?:\/\//, "")}
                                   <ExternalLink className="size-2.5" />
@@ -405,72 +539,80 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                                   href={c.linkedin_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-0.5 text-sky-400 hover:text-sky-300"
+                                  className="inline-flex items-center gap-1 text-sky-300 hover:text-sky-200"
                                 >
                                   <Linkedin className="size-3" />
-                                  <span>Page</span>
+                                  Company page
                                 </a>
                               )}
+                              <span className="inline-flex items-center gap-1">
+                                <MapPin className="size-3" />
+                                {c.location}
+                              </span>
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="p-3">
-                        <div className="flex flex-col gap-1">
+                      <td className={tableClasses.td}>
+                        {c.intel?.buying_trigger ? (
+                          <div className="space-y-2">
+                            <p className="line-clamp-2 text-[13px] font-medium leading-5 text-foreground">
+                              {c.intel.buying_trigger}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Pill tone={intentTone(c.intel.intent_level)}>
+                                {c.intel.intent_level}
+                              </Pill>
+                              {c.intel.trigger_age && (
+                                <Pill tone="neutral">{c.intel.trigger_age}</Pill>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground">
+                            No verified trigger yet
+                          </span>
+                        )}
+                      </td>
+                      <td className={tableClasses.td}>
+                        <div className="flex flex-col items-start gap-1.5">
                           {c.industry ? (
-                            <span className="inline-flex w-fit items-center rounded-md border border-border bg-card px-2 py-0.5 text-xs text-foreground">
-                              {c.industry}
-                            </span>
+                            <Pill tone="violet">{c.industry}</Pill>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              Industry unlisted
+                            </span>
                           )}
                           {c.employee_count && (
-                            <span className="inline-flex w-fit items-center gap-1 text-[11px] text-muted-foreground">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                               <Users className="size-3" />
                               {c.employee_count} headcount
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="p-3 text-xs text-muted-foreground">
-                        {c.location}
-                      </td>
-                      <td className="p-3">
+                      <td className={tableClasses.td}>
                         {c.contacts.length ? (
-                          <div className="flex flex-col gap-1.5">
-                            {c.contacts.map((p) => {
-                              const tier = p.role_tier || "primary";
-                              const tierStyle =
-                                tier === "primary"
-                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                                  : tier === "secondary"
-                                    ? "border-sky-500/30 bg-sky-500/10 text-sky-400"
-                                    : "border-amber-500/30 bg-amber-500/10 text-amber-400";
-                              return (
-                                <div
-                                  key={p.id}
-                                  className="flex items-center gap-2 text-xs"
-                                >
-                                  <span
-                                    className={cn(
-                                      "rounded-full border px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider",
-                                      tierStyle,
-                                    )}
-                                  >
-                                    {tier}
-                                  </span>
-                                  <span className="font-medium text-foreground">
+                          <div className="space-y-2">
+                            {c.contacts.map((p) => (
+                              <div key={p.id} className="flex items-start gap-2">
+                                <TierPill tier={p.role_tier} />
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-medium leading-4 text-foreground">
                                     {p.first_name} {p.last_name || ""}
-                                  </span>
-                                  <span className="text-muted-foreground">
-                                    · {p.job_title}
-                                  </span>
+                                  </p>
+                                  <p className="truncate text-[11px] leading-4 text-muted-foreground">
+                                    {p.job_title}
+                                  </p>
+                                </div>
+                                <div className="ml-auto flex shrink-0 items-center gap-1">
                                   {p.linkedin_url && (
                                     <a
                                       href={p.linkedin_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-muted-foreground hover:text-sky-400"
+                                      aria-label={`LinkedIn profile for ${p.first_name}`}
+                                      className="grid size-6 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:border-sky-500/40 hover:text-sky-300"
                                     >
                                       <Linkedin className="size-3" />
                                     </a>
@@ -478,10 +620,9 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                                   {p.email && (
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        copyText(`c-email-${p.id}`, p.email!)
-                                      }
-                                      className="text-muted-foreground hover:text-primary"
+                                      aria-label={`Copy email for ${p.first_name}`}
+                                      onClick={() => copyText(`c-email-${p.id}`, p.email!)}
+                                      className="grid size-6 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
                                     >
                                       {copiedKey === `c-email-${p.id}` ? (
                                         <Check className="size-3 text-emerald-400" />
@@ -491,8 +632,8 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                                     </button>
                                   )}
                                 </div>
-                              );
-                            })}
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <span className="text-xs italic text-muted-foreground">
@@ -500,32 +641,43 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                           </span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className={tableClasses.td}>
                         {c.opportunity ? (
-                          <Link
-                            href={`/dashboard/opportunities?lead=${c.opportunity.id}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
-                          >
-                            {c.opportunity.deal_name}
-                            <ArrowUpRight className="size-3" />
-                          </Link>
+                          <div className="space-y-1.5">
+                            <Link
+                              href={`/dashboard/opportunities?lead=${c.opportunity.id}`}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            >
+                              {c.opportunity.deal_name}
+                              <ArrowUpRight className="size-3" />
+                            </Link>
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatInr(c.opportunity.deal_value, true)} ·{" "}
+                              <span className={STAGE_META[c.opportunity.stage]?.tone}>
+                                {c.opportunity.stage}
+                              </span>
+                            </p>
+                          </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mr-2 h-7 text-xs"
-                          onClick={() => setInspectId(c.id)}
-                        >
-                          Inspect
-                        </Button>
-                        <DeleteButton
-                          label="company"
-                          onDelete={() => void dc.run(c.id)}
-                        />
+                      <td className={cn(tableClasses.td, "text-right")}>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 text-xs"
+                            onClick={() => setInspectId(c.id)}
+                          >
+                            Inspect
+                            <ArrowUpRight className="size-3" />
+                          </Button>
+                          <DeleteButton
+                            label="company"
+                            onDelete={() => void dc.run(c.id)}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -533,174 +685,187 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
               </table>
             </div>
           ) : (
-            <Empty
-              title={q ? "No matching companies." : "No accounts registered yet."}
-              description="Add a target company or wait for the 08:00 AM IST morning lead drop."
-              action={!q && <CreateRecord kind="company" />}
-            />
+            <div className="p-5">
+              <Empty
+                title={q ? "No matching companies." : "No accounts registered yet."}
+                description="Add a target company or wait for the 08:00 AM IST morning lead drop."
+                action={!q && <CreateRecord kind="company" />}
+              />
+            </div>
           )
         ) : filteredPeople.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="p-3">Decision Maker</th>
-                  <th className="p-3">Organization</th>
-                  <th className="p-3">Direct Channels</th>
-                  <th className="p-3">Active Pipeline</th>
-                  <th className="p-3 text-right">Actions</th>
+            <table className={tableClasses.table}>
+              <thead>
+                <tr>
+                  <th className={cn(tableClasses.th, "w-[24%]")}>Decision maker</th>
+                  <th className={cn(tableClasses.th, "w-[20%]")}>Account</th>
+                  <th className={cn(tableClasses.th, "w-[23%]")}>Buying signal</th>
+                  <th className={cn(tableClasses.th, "w-[21%]")}>Direct channels</th>
+                  <th className={cn(tableClasses.th, "w-[12%]")}>Pipeline</th>
+                  <th className={cn(tableClasses.th, "text-right")}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPeople.map((p) => {
-                  const tier = p.role_tier || "primary";
-                  const tierLabel =
-                    tier === "primary"
-                      ? "Primary Leader"
-                      : tier === "secondary"
-                        ? "Co-Founder / VP"
-                        : "Tech Head";
-                  const tierStyle =
-                    tier === "primary"
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                      : tier === "secondary"
-                        ? "border-sky-500/30 bg-sky-500/10 text-sky-400"
-                        : "border-amber-500/30 bg-amber-500/10 text-amber-400";
-
-                  return (
-                    <tr
-                      key={p.id}
-                      className="border-t border-border transition-colors hover:bg-muted/20"
+                {filteredPeople.map((p) => (
+                  <tr key={p.id} className={tableClasses.row}>
+                    <td
+                      className={cn(
+                        tableClasses.td,
+                        "border-l-2 border-l-transparent transition-colors group-hover:border-l-primary/70",
+                      )}
                     >
-                      <td className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-mono text-xs font-semibold text-primary">
-                            {(p.name[0] || "P").toUpperCase()}
+                      <div className="flex items-start gap-3">
+                        <div className="grid size-10 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 font-mono text-sm font-semibold text-primary">
+                          {(p.name[0] || "P").toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setInspectId(p.id)}
+                              className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-primary hover:underline"
+                            >
+                              {p.name}
+                            </button>
+                            <TierPill tier={p.role_tier} />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setInspectId(p.id)}
-                                className="text-left font-medium text-foreground hover:text-primary hover:underline"
-                              >
-                                {p.name}
-                              </button>
-                              <span
-                                className={cn(
-                                  "rounded-full border px-1.5 py-0.2 text-[9px] font-semibold tracking-wider",
-                                  tierStyle,
-                                )}
-                              >
-                                {tierLabel}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {p.title}
+                          <p className="mt-0.5 text-[12px] text-muted-foreground">
+                            {p.title}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={tableClasses.td}>
+                      {p.company ? (
+                        <div className="flex items-start gap-2.5">
+                          <CompanyFavicon
+                            domain={p.company.domain}
+                            website={p.company.website}
+                            name={p.company.name}
+                            size={28}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium leading-5 text-foreground">
+                              {p.company.name}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {p.company.location || "Location unlisted"}
                             </p>
                           </div>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        {p.company ? (
-                          <div className="flex items-center gap-2.5">
-                            <CompanyFavicon
-                              domain={p.company.domain}
-                              website={p.company.website}
-                              name={p.company.name}
-                              size={24}
-                            />
-                            <div className="text-xs">
-                              <span className="font-medium text-foreground">
-                                {p.company.name}
-                              </span>
-                              {p.company.location && (
-                                <span className="block text-muted-foreground">
-                                  {p.company.location}
-                                </span>
-                              )}
-                            </div>
+                      ) : (
+                        <span className="text-xs italic text-muted-foreground">
+                          No company linked
+                        </span>
+                      )}
+                    </td>
+                    <td className={tableClasses.td}>
+                      {p.intel?.buying_trigger ? (
+                        <div className="space-y-2">
+                          <p className="line-clamp-2 text-[13px] font-medium leading-5 text-foreground">
+                            {p.intel.buying_trigger}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Pill tone={intentTone(p.intel.intent_level)}>
+                              {p.intel.intent_level}
+                            </Pill>
+                            {p.intel.trigger_age && (
+                              <Pill tone="neutral">{p.intel.trigger_age}</Pill>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-xs italic text-muted-foreground">
-                            No company linked
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          {p.linkedin_url && (
-                            <a
-                              href={p.linkedin_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground hover:border-sky-500/40 hover:text-sky-400"
-                            >
-                              <Linkedin className="size-3 text-sky-400" />
-                              <span>LinkedIn</span>
-                            </a>
-                          )}
-                          {p.email ? (
-                            <button
-                              type="button"
-                              onClick={() => copyText(`p-email-${p.id}`, p.email)}
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
-                            >
-                              {copiedKey === `p-email-${p.id}` ? (
-                                <Check className="size-3" />
-                              ) : (
-                                <Mail className="size-3" />
-                              )}
-                              <span>{p.email}</span>
-                            </button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Email unlisted
-                            </span>
-                          )}
                         </div>
-                      </td>
-                      <td className="p-3">
-                        {p.opportunity ? (
+                      ) : (
+                        <span className="text-xs italic text-muted-foreground">
+                          No verified trigger yet
+                        </span>
+                      )}
+                    </td>
+                    <td className={tableClasses.td}>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {p.linkedin_url ? (
+                          <a
+                            href={p.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-300 hover:bg-sky-500/20"
+                          >
+                            <Linkedin className="size-3" />
+                            LinkedIn
+                          </a>
+                        ) : null}
+                        {p.email ? (
+                          <button
+                            type="button"
+                            onClick={() => copyText(`p-email-${p.id}`, p.email)}
+                            className="inline-flex h-7 max-w-[210px] items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                            title="Copy work email"
+                          >
+                            {copiedKey === `p-email-${p.id}` ? (
+                              <Check className="size-3" />
+                            ) : (
+                              <Mail className="size-3" />
+                            )}
+                            <span className="truncate font-mono">{p.email}</span>
+                          </button>
+                        ) : (
+                          <Pill tone="neutral">Email unlisted</Pill>
+                        )}
+                      </div>
+                    </td>
+                    <td className={tableClasses.td}>
+                      {p.opportunity ? (
+                        <div className="space-y-1.5">
                           <Link
                             href={`/dashboard/opportunities?lead=${p.opportunity.id}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                           >
                             {p.opportunity.deal_name}
                             <ArrowUpRight className="size-3" />
                           </Link>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right">
+                          <p className="text-[11px] text-muted-foreground">
+                            {formatInr(p.opportunity.deal_value, true)} ·{" "}
+                            <span className={STAGE_META[p.opportunity.stage]?.tone}>
+                              {p.opportunity.stage}
+                            </span>
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className={cn(tableClasses.td, "text-right")}>
+                      <div className="flex items-center justify-end gap-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="mr-2 h-7 text-xs"
+                          className="h-8 gap-1 text-xs"
                           onClick={() => setInspectId(p.id)}
                         >
                           Inspect
+                          <ArrowUpRight className="size-3" />
                         </Button>
                         <DeleteButton
                           label="person"
                           onDelete={() => void dp.run(p.id)}
                         />
-                      </td>
-                    </tr>
-                  );
-                })}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <Empty
-            title={
-              q ? "No matching decision-makers." : "No contacts registered yet."
-            }
-            description="Add a commercial contact or wait for your morning lead drop."
-            action={!q && <CreateRecord kind="person" />}
-          />
+          <div className="p-5">
+            <Empty
+              title={
+                q ? "No matching decision-makers." : "No contacts registered yet."
+              }
+              description="Add a commercial contact or wait for your morning lead drop."
+              action={!q && <CreateRecord kind="person" />}
+            />
+          </div>
         )}
       </Panel>
 
@@ -1159,14 +1324,26 @@ export function TasksPage() {
       (filter === "all" || (filter === "completed" ? t.completed : !t.completed)) &&
       (priority === "all" || t.priority === priority),
   );
+  const openTasks = d.tasks.filter((t) => !t.completed);
+  const overdue = openTasks.filter((t) => t.due_at && new Date(t.due_at).getTime() < Date.now());
+  const highPriority = openTasks.filter((t) => t.priority === "high");
   return (
     <>
       <Header
+        eyebrow="Execution · Daily queue"
+        icon={CheckSquare}
+        tone="rose"
         title="Small steps. Real momentum."
-        description={`${d.tasks.filter((t) => !t.completed).length} open tasks. Keep the queue focused and the conversations moving.`}
+        description={`${openTasks.length} open tasks. Keep the queue focused and the conversations moving.`}
         action={<CreateRecord kind="task" />}
       />
-      <div className="mb-5 flex flex-wrap gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatTile label="Open tasks" value={openTasks.length} hint="Across the workspace" icon={CheckSquare} tone="primary" />
+        <StatTile label="High priority" value={highPriority.length} hint="Needs attention first" icon={Target} tone="rose" />
+        <StatTile label="Overdue" value={overdue.length} hint="Past their due date" icon={Radar} tone="amber" />
+        <StatTile label="Completed" value={d.tasks.length - openTasks.length} hint={`${d.tasks.length} tasks tracked`} icon={Check} tone="emerald" />
+      </div>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <select
           aria-label="Task status"
           className={cn(fieldClass, "w-auto")}
@@ -1188,50 +1365,59 @@ export function TasksPage() {
             <option key={p}>{p}</option>
           ))}
         </select>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {rows.length} shown
+        </span>
       </div>
       {rows.length ? (
-        <Panel>
-          {rows.map((t: Task) => (
-            <div
-              key={t.id}
-              className="flex items-center gap-4 border-b border-border py-4 last:border-0"
-            >
-              <input
-                type="checkbox"
-                aria-label={`Complete ${t.title}`}
-                checked={t.completed}
-                onChange={() =>
-                  void optimistic(
-                    (data) => ({
-                      ...data,
-                      tasks: data.tasks.map((row) =>
-                        row.id === t.id ? { ...row, completed: !t.completed } : row,
-                      ),
-                    }),
-                    () => toggle.mutateAsync({ id: t.id, completed: !t.completed }),
-                  )
-                }
-                className="size-5 accent-primary"
-              />
-              <div className="min-w-0 flex-1">
-                <p
-                  className={cn(
-                    "break-words text-sm",
-                    t.completed && "text-muted-foreground line-through",
-                  )}
-                >
-                  {t.title}
-                </p>
-                {t.description && (
-                  <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
-                )}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t.priority} priority · {t.due_at ? formatDate(t.due_at) : "No due date"}
-                </p>
-              </div>
-              <DeleteButton label="task" onDelete={() => void del.run(t.id)} />
-            </div>
-          ))}
+        <Panel variant="flush">
+          <div className="divide-y divide-border">
+            {rows.map((t: Task) => {
+              const isOverdue = !t.completed && Boolean(t.due_at) && new Date(t.due_at!).getTime() < Date.now();
+              return (
+                <div key={t.id} className="flex items-start gap-3 px-5 py-4 transition-colors hover:bg-primary/[0.04]">
+                  <input
+                    type="checkbox"
+                    aria-label={`Complete ${t.title}`}
+                    checked={t.completed}
+                    onChange={() =>
+                      void optimistic(
+                        (data) => ({
+                          ...data,
+                          tasks: data.tasks.map((row) =>
+                            row.id === t.id ? { ...row, completed: !t.completed } : row,
+                          ),
+                        }),
+                        () => toggle.mutateAsync({ id: t.id, completed: !t.completed }),
+                      )
+                    }
+                    className="mt-0.5 size-5 accent-primary"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p
+                        className={cn(
+                          "break-words text-[14px] font-medium leading-5 text-foreground",
+                          t.completed && "text-muted-foreground line-through",
+                        )}
+                      >
+                        {t.title}
+                      </p>
+                      <PriorityPill priority={t.priority} />
+                      {isOverdue && <Pill tone="rose">Overdue</Pill>}
+                    </div>
+                    {t.description && (
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.description}</p>
+                    )}
+                    <p className="mt-1 text-[11px] uppercase tracking-[.12em] text-muted-foreground">
+                      {t.due_at ? `Due ${formatDate(t.due_at)}` : "No due date"}
+                    </p>
+                  </div>
+                  <DeleteButton label="task" onDelete={() => void del.run(t.id)} />
+                </div>
+              );
+            })}
+          </div>
         </Panel>
       ) : (
         <Empty
@@ -1250,6 +1436,9 @@ export function TeamPage() {
   return (
     <>
       <Header
+        eyebrow="Agency · Roster"
+        icon={Users}
+        tone="primary"
         title="Good work grows together."
         description="Your agency roster. Adding a member records their details; it does not grant account access or send email."
         action={<CreateRecord kind="member" />}
@@ -1258,14 +1447,31 @@ export function TeamPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {d.team_members.map((m) => (
             <Panel key={m.id}>
-              <h2 className="font-display text-2xl">{m.name}</h2>
-              <p className="mt-1 break-all text-sm text-muted-foreground">{m.email}</p>
-              <p className="my-4 text-xs text-primary">
-                {m.status} · added {formatDate(m.joined_at)}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="grid size-10 place-items-center rounded-full border border-primary/25 bg-primary/10 font-mono text-sm font-semibold text-primary">
+                    {initials(m.name) || "T"}
+                  </div>
+                  <div>
+                    <h2 className="font-display text-xl leading-tight">{m.name}</h2>
+                    <p className="mt-0.5 break-all text-xs text-muted-foreground">{m.email}</p>
+                  </div>
+                </div>
+                <Pill tone={m.status === "Active" ? "emerald" : "amber"} dot>
+                  {m.status}
+                </Pill>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-4">
+                <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
+                  Role
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Joined {formatDate(m.joined_at)}
+                </span>
+              </div>
               <select
                 aria-label={`Role for ${m.name}`}
-                className={fieldClass}
+                className={cn(fieldClass, "mt-2")}
                 value={m.role}
                 disabled={role.isPending}
                 onChange={(e) => void role.run({ id: m.id, role: e.target.value })}
@@ -1305,6 +1511,9 @@ export function SettingsPage() {
   return (
     <>
       <Header
+        eyebrow="Account · Workspace"
+        icon={Settings}
+        tone="neutral"
         title="Make yourself at home."
         description="Your workspace identity, delivery preferences and the details that make LILY yours."
       />

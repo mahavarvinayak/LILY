@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/components/app/workspace-ui";
 import { api, workspaceKey } from "@/lib/workspace";
-import { formatDate, cn } from "@/lib/utils";
+import { timeAgo, cn } from "@/lib/utils";
 
 export function ActivityCenter() {
   const d = useWorkspace();
@@ -39,14 +39,55 @@ export function ActivityCenter() {
         return <Send className="size-3.5 text-primary" />;
       case "lead_injected":
       case "batch_ingest":
-        return <Building2 className="size-3.5 text-emerald-400" />;
+        return <Building2 className="size-3.5 text-emerald-300" />;
       case "draft_generated":
-        return <Sparkles className="size-3.5 text-sky-400" />;
+        return <Sparkles className="size-3.5 text-sky-300" />;
       case "task_completed":
-        return <CheckCircle2 className="size-3.5 text-amber-400" />;
+        return <CheckCircle2 className="size-3.5 text-amber-300" />;
       default:
         return <Clock className="size-3.5 text-muted-foreground" />;
     }
+  }
+
+  const unread = activities.filter((a) => !a.read);
+  const read = activities.filter((a) => a.read);
+
+  function ActivityRow({ act }: { act: (typeof activities)[number] }) {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border-l-2 border-y border-r p-3.5 transition-colors",
+          act.read
+            ? "border-l-transparent border-y-border border-r-border bg-surface/50"
+            : "border-l-primary border-y-primary/25 border-r-primary/25 bg-primary/[0.07]",
+        )}
+      >
+        <div className="flex items-start gap-2.5">
+          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-border-strong bg-background">
+            {getActionIcon(act.action)}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[13px] font-semibold leading-4 text-foreground">
+                {act.title}
+              </p>
+              <span className="shrink-0 pt-0.5 text-[10px] text-muted-foreground">
+                {timeAgo(act.created_at)}
+              </span>
+            </div>
+            {act.description && (
+              <p className="text-[12px] leading-5 text-muted-foreground">{act.description}</p>
+            )}
+            {!act.read && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[.12em] text-primary">
+                <span className="size-1.5 rounded-full bg-primary" />
+                New
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -68,65 +109,62 @@ export function ActivityCenter() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader className="border-b border-border pb-4">
-            <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-primary">
+              Workspace · Audit trail
+            </p>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <SheetTitle className="font-display text-xl text-foreground">
+                <SheetTitle className="font-display text-2xl text-foreground">
                   Activity Center
                 </SheetTitle>
-                <SheetDescription className="text-xs">
-                  Real-time updates, AI agent actions, and pipeline events.
+                <SheetDescription className="mt-1 text-xs">
+                  {unreadCount > 0
+                    ? `${unreadCount} unread update${unreadCount === 1 ? "" : "s"} from LILY and your pipeline.`
+                    : "Every AI action, dispatch and pipeline event in one place."}
                 </SheetDescription>
               </div>
               {unreadCount > 0 && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   disabled={isMarking}
                   onClick={handleMarkAllRead}
-                  className="h-7 gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                  className="h-8 shrink-0 gap-1 text-[11px]"
                 >
                   <CheckCheck className="size-3" />
-                  Mark all read
+                  {isMarking ? "Marking…" : "Mark all read"}
                 </Button>
               )}
             </div>
           </SheetHeader>
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-4">
             {activities.length ? (
-              activities.map((act) => (
-                <div
-                  key={act.id}
-                  className={cn(
-                    "rounded-xl border p-3.5 transition-colors text-xs",
-                    act.read
-                      ? "border-border/60 bg-card/50"
-                      : "border-primary/30 bg-primary/5",
-                  )}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
-                      {getActionIcon(act.action)}
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-semibold text-foreground text-xs">{act.title}</p>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {formatDate(act.created_at)}
-                        </span>
-                      </div>
-                      {act.description && (
-                        <p className="text-muted-foreground text-[11px] leading-relaxed">
-                          {act.description}
-                        </p>
-                      )}
-                    </div>
+              <>
+                {unread.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-muted-foreground">
+                      Unread
+                    </p>
+                    {unread.map((act) => (
+                      <ActivityRow key={act.id} act={act} />
+                    ))}
                   </div>
-                </div>
-              ))
+                )}
+                {read.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-muted-foreground">
+                      Earlier
+                    </p>
+                    {read.map((act) => (
+                      <ActivityRow key={act.id} act={act} />
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="py-12 text-center text-xs text-muted-foreground">
-                <Clock className="mx-auto size-8 opacity-40 mb-2" />
+                <Clock className="mx-auto mb-2 size-8 opacity-40" />
                 No activities logged yet.
               </div>
             )}
@@ -136,3 +174,4 @@ export function ActivityCenter() {
     </>
   );
 }
+

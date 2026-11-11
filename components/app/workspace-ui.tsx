@@ -1,11 +1,13 @@
 import type React from "react";
 import { useEffect, useState, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { LilyMark } from "@/components/lily/lily-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -20,31 +22,91 @@ export const fieldClass =
 export function useWorkspace() {
   return useSuspenseQuery(workspaceQuery()).data;
 }
+export type HeaderTone =
+  | "primary"
+  | "emerald"
+  | "sky"
+  | "amber"
+  | "rose"
+  | "violet"
+  | "neutral";
+
+const headerTone: Record<HeaderTone, string> = {
+  primary: "border-primary/35 bg-primary/10 text-primary",
+  emerald: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300",
+  sky: "border-sky-500/35 bg-sky-500/10 text-sky-300",
+  amber: "border-amber-500/35 bg-amber-500/10 text-amber-300",
+  rose: "border-rose-500/35 bg-rose-500/10 text-rose-300",
+  violet: "border-violet-500/35 bg-violet-500/10 text-violet-300",
+  neutral: "border-border-strong bg-white/5 text-foreground/80",
+};
+
 export function Header({
   title,
   description,
+  eyebrow = "LILY workspace",
+  icon: Icon,
+  tone = "primary",
   action,
 }: {
   title: string;
   description: string;
+  eyebrow?: string;
+  icon?: LucideIcon;
+  tone?: HeaderTone;
   action?: ReactNode;
 }) {
   return (
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="mb-2 text-xs uppercase tracking-[.24em] text-primary">
-          Your agency, in bloom
-        </p>
-        <h1 className="font-display text-4xl tracking-tight md:text-5xl">{title}</h1>
-        <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p>
+      <div className="flex min-w-0 items-start gap-4">
+        {Icon ? (
+          <span
+            className={cn(
+              "mt-1 hidden size-12 shrink-0 place-items-center rounded-2xl border sm:grid",
+              headerTone[tone],
+            )}
+          >
+            <Icon className="size-6" aria-hidden />
+          </span>
+        ) : null}
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center gap-2">
+            <span className={cn("h-px w-6", tone === "neutral" ? "bg-border-strong" : "bg-primary/70")} aria-hidden />
+            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-primary">
+              {eyebrow}
+            </p>
+          </div>
+          <h1 className="font-display text-4xl tracking-tight md:text-5xl">{title}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        </div>
       </div>
       {action}
     </header>
   );
 }
-export function Panel({ children, className = "", style }: { children: ReactNode; className?: string; style?: React.CSSProperties }) {
+export function Panel({
+  children,
+  className = "",
+  style,
+  variant = "default",
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+  variant?: "default" | "flush" | "quiet";
+}) {
+  const variants = {
+    default: "bg-card p-5 shadow-soft",
+    flush: "overflow-hidden bg-card p-0 shadow-soft",
+    quiet: "bg-surface/60 p-5",
+  };
   return (
-    <section style={style} className={`glass isolate rounded-2xl border border-border p-5 ${className}`}>
+    <section
+      style={style}
+      className={`isolate rounded-2xl border border-border-strong ${variants[variant]} ${className}`}
+    >
       {children}
     </section>
   );

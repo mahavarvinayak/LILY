@@ -34,6 +34,8 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-row: var(--row);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
@@ -75,11 +77,11 @@
   --radius: 0.875rem;
   --background: oklch(0.145 0.022 170);
   --foreground: oklch(0.965 0.012 95);
-  --surface: oklch(0.18 0.024 168);
-  --surface-raised: oklch(0.215 0.026 166);
-  --card: oklch(0.19 0.024 168 / 0.72);
+  --surface: oklch(0.172 0.024 168);
+  --surface-raised: oklch(0.225 0.027 166);
+  --card: oklch(0.198 0.025 168 / 0.94);
   --card-foreground: oklch(0.965 0.012 95);
-  --popover: oklch(0.2 0.025 168);
+  --popover: oklch(0.215 0.026 168);
   --popover-foreground: oklch(0.965 0.012 95);
   --primary: oklch(0.82 0.13 158);
   --primary-foreground: oklch(0.17 0.03 165);
@@ -87,13 +89,15 @@
   --secondary: oklch(0.25 0.028 165);
   --secondary-foreground: oklch(0.94 0.012 95);
   --muted: oklch(0.23 0.022 166);
-  --muted-foreground: oklch(0.72 0.022 150);
+  --muted-foreground: oklch(0.765 0.022 150);
   --accent: oklch(0.27 0.035 160);
   --accent-foreground: oklch(0.965 0.012 95);
   --destructive: oklch(0.68 0.19 18);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.96 0.02 120 / 0.1);
-  --input: oklch(0.96 0.02 120 / 0.14);
+  --border: oklch(0.96 0.02 120 / 0.14);
+  --border-strong: oklch(0.96 0.02 120 / 0.22);
+  --row: oklch(0.96 0.02 120 / 0.028);
+  --input: oklch(0.96 0.02 120 / 0.18);
   --ring: oklch(0.82 0.13 158 / 0.6);
 
   --petal: oklch(0.97 0.018 90);
@@ -121,7 +125,7 @@
   --gradient-bloom: linear-gradient(135deg, var(--primary) 0%, var(--primary-glow) 45%, var(--petal) 100%);
   --gradient-dusk: linear-gradient(180deg, oklch(0.145 0.022 170 / 0) 0%, oklch(0.145 0.022 170 / 0.55) 55%, var(--background) 100%);
   --gradient-petal-text: linear-gradient(120deg, var(--petal) 0%, var(--primary-glow) 40%, var(--blush) 80%, var(--pollen) 100%);
-  --gradient-card: linear-gradient(160deg, oklch(0.24 0.03 164 / 0.7), oklch(0.17 0.022 170 / 0.55));
+  --gradient-card: linear-gradient(160deg, oklch(0.235 0.029 164 / 0.92), oklch(0.166 0.021 170 / 0.9));
   --shadow-glow-value: 0 0 0 1px oklch(0.82 0.13 158 / 0.25), 0 10px 40px -10px oklch(0.82 0.13 158 / 0.45);
   --shadow-soft-value: 0 20px 60px -25px oklch(0 0 0 / 0.7);
   --shadow-petal-value: 0 30px 80px -30px oklch(0.82 0.09 10 / 0.35);

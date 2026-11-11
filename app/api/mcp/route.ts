@@ -375,9 +375,16 @@ export async function POST(request: Request) {
         const sFirst = parts[0];
         const sLast = parts.slice(1).join(" ") || null;
         const sTitle = String(args.secondary_contact_title || "Executive").trim();
-        const { data: existingSec } = secUrl
-          ? await admin.from("people").select("id").eq("user_id", clientId).eq("linkedin_url", secUrl).maybeSingle()
-          : { data: null };
+        let existingSec = null;
+        if (secUrl) {
+          const { data } = await admin.from("people").select("id").eq("user_id", clientId).eq("linkedin_url", secUrl).maybeSingle();
+          existingSec = data;
+        } else if (companyId && sFirst) {
+          let query = admin.from("people").select("id").eq("user_id", clientId).eq("company_id", companyId).eq("first_name", sFirst);
+          if (sLast) query = query.eq("last_name", sLast);
+          const { data } = await query.maybeSingle();
+          existingSec = data;
+        }
         if (!existingSec) {
           await admin.from("people").insert({
             user_id: clientId,
@@ -398,9 +405,16 @@ export async function POST(request: Request) {
         const tFirst = parts[0];
         const tLast = parts.slice(1).join(" ") || null;
         const tTitle = String(args.tertiary_contact_title || "Technical Leader").trim();
-        const { data: existingTert } = tertUrl
-          ? await admin.from("people").select("id").eq("user_id", clientId).eq("linkedin_url", tertUrl).maybeSingle()
-          : { data: null };
+        let existingTert = null;
+        if (tertUrl) {
+          const { data } = await admin.from("people").select("id").eq("user_id", clientId).eq("linkedin_url", tertUrl).maybeSingle();
+          existingTert = data;
+        } else if (companyId && tFirst) {
+          let query = admin.from("people").select("id").eq("user_id", clientId).eq("company_id", companyId).eq("first_name", tFirst);
+          if (tLast) query = query.eq("last_name", tLast);
+          const { data } = await query.maybeSingle();
+          existingTert = data;
+        }
         if (!existingTert) {
           await admin.from("people").insert({
             user_id: clientId,

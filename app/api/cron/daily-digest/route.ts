@@ -16,20 +16,7 @@ function digestTypeOf(value: string | null | undefined): DigestType {
   return DIGEST_TYPES.includes(value as DigestType) ? (value as DigestType) : "drop";
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  return handleDigest(request, digestTypeOf(url.searchParams.get("type")));
-}
-
-export async function POST(request: Request) {
-  let body: { type?: string } = {};
-  try {
-    body = (await request.json()) as { type?: string };
-  } catch {}
-  return handleDigest(request, digestTypeOf(body.type));
-}
-
-async function handleDigest(request: Request, digestType: DigestType) {
+function verifyCronAuth(request: Request): NextResponse | null {
   const authHeader = (request.headers.get("authorization") || "").trim();
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -44,6 +31,27 @@ async function handleDigest(request: Request, digestType: DigestType) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  return null;
+}
+
+export async function GET(request: Request) {
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
+  const url = new URL(request.url);
+  return handleDigest(request, digestTypeOf(url.searchParams.get("type")));
+}
+
+export async function POST(request: Request) {
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
+  let body: { type?: string } = {};
+  try {
+    body = (await request.json()) as { type?: string };
+  } catch {}
+  return handleDigest(request, digestTypeOf(body.type));
+}
+
+async function handleDigest(request: Request, digestType: DigestType) {
   if (!isResendConfigured()) {
     return NextResponse.json({
       ok: true,

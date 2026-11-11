@@ -33,3 +33,4 @@ create policy "activity_logs: user update own" on public.activity_logs
 drop policy if exists "activity_logs: user insert own" on public.activity_logs;
 create policy "activity_logs: user insert own" on public.activity_logs
   for insert with check (user_id = auth.uid() or public.is_super_admin());
+
