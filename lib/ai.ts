@@ -1,5 +1,6 @@
 import dns from "node:dns";
 import { env, isGroqConfigured, isZaiConfigured } from "@/lib/env";
+import { sanitizeTriggerText } from "@/lib/intelligence";
 
 try {
   dns.setDefaultResultOrder?.("ipv4first");
@@ -23,16 +24,13 @@ export interface Draft {
 function fallbackDraft(lead: DraftLead): Draft {
   const firstName = lead.person.split(/\s+/)[0] ?? lead.person;
   const company = lead.company;
-  const signal = lead.trigger
-    .replace(/\s*\((?:posted\s*)?\d+[dh]\s*ago\)$/i, "")
-    .replace(/\s*\(.*?ago\)$/i, "")
-    .trim();
-  const shortSignal = signal.split(/\s+/).slice(0, 7).join(" ").replace(/[.,;:]$/, "");
+  const cleanTrigger = sanitizeTriggerText(lead.trigger) || "scaling core operations";
+  const shortTrigger = cleanTrigger.split(/\s+/).slice(0, 6).join(" ").replace(/[.,;:]$/, "");
 
   return {
     id: lead.id,
-    subject: `${company}: ${shortSignal.slice(0, 64)}`,
-    body: `${firstName} — ${signal} stood out this morning. For a team at ${company}'s stage, that usually means the current growth motion is about to be outpaced.\nWe map the gap before it gets expensive. Worth a 12-minute look?`,
+    subject: `Quick note on ${company}'s ${shortTrigger}`,
+    body: `Hi ${firstName},\n\nSaw ${company} is actively ${cleanTrigger}. Most founders I speak with find that hiring senior talent creates a 6-to-8 week lag that pushes quarterly release targets back.\n\nWe deploy pre-vetted senior pods ready to execute sprint objectives from Day 1—with zero recruitment overhead.\n\nOpen to a brief 4-minute chat this Thursday to compare notes?\n\nBest,`,
   };
 }
 
@@ -160,7 +158,7 @@ export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
   const fallback = leads.map(fallbackDraft);
 
   const systemPrompt =
-    "You write cold outreach for a boutique digital agency. For each lead, return a specific subject line (max 9 words) and a two-line icebreaker (max 48 words total). Reference the exact buying trigger. No flattery, no 'hope you are well', no emojis, no bullet points, no invented facts. Write like a sharp operator, not a marketer. Return strict JSON: {\"drafts\":[{\"id\":\"...\",\"subject\":\"...\",\"body\":\"...\"}]}";
+    "You write high-converting B2B cold outreach for a boutique tech and revenue infrastructure agency. For each lead, return a specific subject line (max 7 words, no clickbait) and a 3-sentence email body (max 60 words). Sentence 1: hook referencing their exact hiring or expansion trigger without scraper tokens. Sentence 2: concrete value proposition (solving the 6-to-8 week hiring lag with instant vetted engineering or growth pods). Sentence 3: one low-friction ask (e.g. 'Worth a 4-minute chat this Thursday?'). No flattery, no 'hope you are well', no emojis, no bullet points, no invented facts. Write like a top-tier peer operator. Return strict JSON: {\"drafts\":[{\"id\":\"...\",\"subject\":\"...\",\"body\":\"...\"}]}";
 
   const userPayload = {
     leads: leads.map((lead) => ({

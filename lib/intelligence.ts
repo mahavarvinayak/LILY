@@ -37,12 +37,40 @@ export interface LeadIntelligence31 {
   recent_founder_activity: string;
   ai_icebreaker: string;
   email_subject_line: string;
+  linkedin_note?: string;
+  linkedin_message?: string;
 
   verification_status: string;
   source_attribution: string;
 }
 
 export type LeadIntelligence24 = LeadIntelligence31;
+
+export function sanitizeTriggerText(text: string | null | undefined): string {
+  if (!text) return "";
+  return text
+    .replace(/\s*\((?:posted\s*)?(?:job|req(?:uisition)?)\s*id:?[^)]*\)/gi, "")
+    .replace(/\s*\((?:posted\s*)?\d+[dh]\s*ago\)$/i, "")
+    .replace(/\s*\(.*?ago\)$/i, "")
+    .replace(/\s*(?:job|req(?:uisition)?)\s*id:?\s*\w+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export function synthesizeDefaultPitch(company: string, contactName: string, rawTrigger: string) {
+  const firstName = contactName.split(/\s+/)[0] || "there";
+  const cleanTrigger = sanitizeTriggerText(rawTrigger) || "scaling core operations";
+  const shortTrigger = cleanTrigger.split(/\s+/).slice(0, 6).join(" ").replace(/[.,;:]$/, "");
+
+  const emailSubject = `Quick note on ${company}'s ${shortTrigger}`;
+  const emailBody = `Hi ${firstName},\n\nSaw ${company} is actively ${cleanTrigger}. Most founders I speak with find that hiring senior talent creates a 6-to-8 week lag that pushes quarterly release targets back.\n\nWe deploy pre-vetted senior pods ready to execute sprint objectives from Day 1—with zero recruitment overhead.\n\nOpen to a brief 4-minute chat this Thursday to compare notes?\n\nBest,`;
+
+  const linkedinNote = `Hi ${firstName}, noticed you're ${cleanTrigger} at ${company}. We help growth teams hit delivery milestones without the 8-week hiring lag. Open to connecting?`;
+
+  const linkedinMessage = `Hey ${firstName},\n\nSaw ${company} is actively ${cleanTrigger}.\n\nFounders in your space usually tell us standard hiring vendor cycles eat into sprint velocity and stall deliverables.\n\nWe provide dedicated, pre-vetted pods with instant deployment—no recruitment lag.\n\nWorth a brief 5-minute sync on Thursday to see if our bench matches your roadmap?`;
+
+  return { emailSubject, emailBody, linkedinNote, linkedinMessage };
+}
 
 export function parseJsonNotes(notes: string | null | undefined): Partial<LeadIntelligence31> {
   if (!notes) return {};
@@ -105,10 +133,13 @@ export function extractLeadIntelligence(
     jsonMeta.linkedin_url ||
     "";
 
-  const buyingTrigger =
+  const rawBuyingTrigger =
     opp.buying_trigger ||
     jsonMeta.buying_trigger ||
     "";
+  const buyingTrigger = sanitizeTriggerText(rawBuyingTrigger);
+
+  const defaultPitch = synthesizeDefaultPitch(companyName, contactName, buyingTrigger);
 
   const triggerUrl =
     opp.trigger_url ||
@@ -118,12 +149,20 @@ export function extractLeadIntelligence(
   const aiIcebreaker =
     opp.ai_icebreaker ||
     jsonMeta.ai_icebreaker ||
-    "";
+    defaultPitch.emailBody;
 
   const emailSubjectLine =
     opp.ai_subject_line ||
     jsonMeta.email_subject_line ||
-    `Regarding ${companyName}`;
+    defaultPitch.emailSubject;
+
+  const linkedinNote =
+    jsonMeta.linkedin_note ||
+    defaultPitch.linkedinNote;
+
+  const linkedinMessage =
+    jsonMeta.linkedin_message ||
+    defaultPitch.linkedinMessage;
 
   return {
     company_name: companyName,
@@ -199,6 +238,8 @@ export function extractLeadIntelligence(
       "",
     ai_icebreaker: aiIcebreaker,
     email_subject_line: emailSubjectLine,
+    linkedin_note: linkedinNote,
+    linkedin_message: linkedinMessage,
     verification_status:
       jsonMeta.verification_status ||
       "Verified 100%",

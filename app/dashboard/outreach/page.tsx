@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Mail,
   AlertCircle,
+  MessageSquare,
 } from "lucide-react";
 import {
   Header,
@@ -29,7 +30,7 @@ import { CompanyFavicon } from "@/components/app/company-favicon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { extractLeadIntelligence } from "@/lib/intelligence";
+import { extractLeadIntelligence, sanitizeTriggerText } from "@/lib/intelligence";
 import { export31FieldsToCsv } from "@/lib/export-csv";
 import { api, workspaceKey } from "@/lib/workspace";
 import { cn, formatInr } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default function OutreachStudioPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "has-email" | "ready" | "dispatched">("all");
+  const [activeChannel, setActiveChannel] = useState<"email" | "linkedin">("email");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -47,6 +49,7 @@ export default function OutreachStudioPage() {
   const [isDraftingSingle, setIsDraftingSingle] = useState(false);
 
   const saveDraft = useWrite(api.updateDraft, "Outreach pitch saved");
+  const markContacted = useWrite(api.updateStage, "Marked as contacted on LinkedIn");
 
   const { data: mailboxData } = useQuery<{
     ok: boolean;
@@ -103,6 +106,8 @@ export default function OutreachStudioPage() {
 
   const [customSubject, setCustomSubject] = useState("");
   const [customBody, setCustomBody] = useState("");
+  const [customLinkedinNote, setCustomLinkedinNote] = useState("");
+  const [customLinkedinMessage, setCustomLinkedinMessage] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [editingOppId, setEditingOppId] = useState<string | null>(null);
 
@@ -111,6 +116,8 @@ export default function OutreachStudioPage() {
     setCustomSubject(activeItem.opp.ai_subject_line || activeItem.intel.email_subject_line);
     setCustomBody(activeItem.opp.ai_icebreaker || activeItem.intel.ai_icebreaker);
     setRecipientEmail(activeItem.intel.work_email || "");
+    setCustomLinkedinNote(activeItem.intel.linkedin_note || "");
+    setCustomLinkedinMessage(activeItem.intel.linkedin_message || "");
   }
 
   function copyText(key: string, val: string) {
@@ -257,7 +264,7 @@ export default function OutreachStudioPage() {
         icon={Send}
         tone="emerald"
         title="Outreach Studio"
-        description="Human-in-the-loop review and 1-click dispatch. Review pitches and send through your connected mailbox."
+        description="Dual-channel review for Email and LinkedIn. Tailored pitches ready for 1-click execution."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -424,6 +431,7 @@ export default function OutreachStudioPage() {
                 {filteredLeads.map(({ opp, intel, hasEmail }) => {
                   const isSelected = activeItem?.opp.id === opp.id;
                   const isDispatched = opp.outreach_dispatched;
+                  const cleanTrigger = sanitizeTriggerText(intel.buying_trigger);
 
                   return (
                     <button
@@ -469,12 +477,12 @@ export default function OutreachStudioPage() {
                           </p>
                         </div>
                       </div>
-                      {intel.buying_trigger && (
+                      {cleanTrigger && (
                         <p
-                          title={intel.buying_trigger}
+                          title={cleanTrigger}
                           className="mt-2 line-clamp-2 break-words text-[11px] leading-4 text-primary/90"
                         >
-                          {intel.buying_trigger}
+                          {cleanTrigger}
                         </p>
                       )}
                       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
@@ -545,6 +553,35 @@ export default function OutreachStudioPage() {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2 border-b border-border bg-surface/50 p-2.5 px-5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveChannel("email")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
+                      activeChannel === "email"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                    )}
+                  >
+                    <Mail className="size-3.5" />
+                    Email Outreach
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveChannel("linkedin")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
+                      activeChannel === "linkedin"
+                        ? "bg-sky-500 text-white shadow-sm"
+                        : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                    )}
+                  >
+                    <Linkedin className="size-3.5" />
+                    LinkedIn Outreach
+                  </button>
+                </div>
+
                 <div className="space-y-5 p-5">
                   <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -562,178 +599,289 @@ export default function OutreachStudioPage() {
                       </div>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-foreground">
-                      {activeItem.intel.buying_trigger || "No buying trigger recorded yet."}
+                      {sanitizeTriggerText(activeItem.intel.buying_trigger) || "Active operational expansion."}
                     </p>
-                    {activeItem.intel.trigger_url && (
-                      <a
-                        href={activeItem.intel.trigger_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 hover:underline"
-                      >
-                        Audit proof trail <ExternalLink className="size-3" />
-                      </a>
-                    )}
                   </div>
 
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <Label htmlFor="pitch-recipient" className="text-xs font-semibold text-foreground">
-                        Recipient Decision Maker Email
-                      </Label>
-                      <span className="text-[11px] text-muted-foreground">
-                        Direct destination inbox
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="pitch-recipient"
-                        type="email"
-                        value={recipientEmail}
-                        onChange={(e) => setRecipientEmail(e.target.value)}
-                        placeholder="e.g. founder@company.com"
-                        className="font-mono text-sm"
-                      />
-                      {recipientEmail && recipientEmail.includes("@") ? (
-                        <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
-                          <Check className="size-3" /> Ready
-                        </span>
-                      ) : (
-                        <span className="flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-400">
-                          <AlertCircle className="size-3" /> Required
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <Label htmlFor="pitch-subject" className="text-xs font-semibold text-foreground">
-                          Subject line
-                        </Label>
+                  {activeChannel === "email" ? (
+                    <>
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <Label htmlFor="pitch-recipient" className="text-xs font-semibold text-foreground">
+                            Recipient Decision Maker Email
+                          </Label>
+                          <span className="text-[11px] text-muted-foreground">
+                            Direct destination inbox
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={isDraftingSingle}
-                            onClick={() => handleDraftSingleWithAi(activeItem.intel.company_name)}
-                            className="h-6 gap-1 text-[11px] text-primary hover:text-primary"
+                          <Input
+                            id="pitch-recipient"
+                            type="email"
+                            value={recipientEmail}
+                            onChange={(e) => setRecipientEmail(e.target.value)}
+                            placeholder="e.g. founder@company.com"
+                            className="font-mono text-sm"
+                          />
+                          {recipientEmail && recipientEmail.includes("@") ? (
+                            <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
+                              <Check className="size-3" /> Ready
+                            </span>
+                          ) : (
+                            <span className="flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-400">
+                              <AlertCircle className="size-3" /> Required
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <div className="mb-1.5 flex items-center justify-between">
+                            <Label htmlFor="pitch-subject" className="text-xs font-semibold text-foreground">
+                              Subject line
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isDraftingSingle}
+                                onClick={() => handleDraftSingleWithAi(activeItem.intel.company_name)}
+                                className="h-6 gap-1 text-[11px] text-primary hover:text-primary"
+                              >
+                                <Sparkles className="size-3" />
+                                {isDraftingSingle ? "Drafting…" : "Regenerate angle with AI"}
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={() => copyText("pitch-subject", customSubject)}
+                                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                              >
+                                {copiedKey === "pitch-subject" ? (
+                                  <Check className="size-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="size-3" />
+                                )}
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                          <Input
+                            id="pitch-subject"
+                            value={customSubject}
+                            onChange={(e) => setCustomSubject(e.target.value)}
+                            className="font-mono text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="mb-1.5 flex items-center justify-between">
+                            <Label htmlFor="pitch-body" className="text-xs font-semibold text-foreground">
+                              Personalized 3-sentence outreach body
+                            </Label>
+                            <button
+                              type="button"
+                              onClick={() => copyText("pitch-body", customBody)}
+                              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                            >
+                              {copiedKey === "pitch-body" ? (
+                                <Check className="size-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="size-3" />
+                              )}
+                              Copy
+                            </button>
+                          </div>
+                          <textarea
+                            id="pitch-body"
+                            rows={7}
+                            value={customBody}
+                            onChange={(e) => setCustomBody(e.target.value)}
+                            className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-primary focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {activeMailbox ? (
+                        <div className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300">
+                          <ShieldCheck className="size-4 shrink-0 text-emerald-400" />
+                          <span className="min-w-0 break-words">
+                            Sending from your connected agency mailbox:{" "}
+                            <strong className="font-mono text-foreground">{activeMailbox.email}</strong>{" "}
+                            ({activeMailbox.appName})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-300">
+                          <div className="flex items-center gap-2">
+                            <Mail className="size-4 shrink-0 text-amber-400" />
+                            <span>No client mailbox connected. Connect your Google Workspace, Outlook, or SMTP to send.</span>
+                          </div>
+                          <Link
+                            href="/dashboard/connectors"
+                            className="rounded-md border border-amber-500/40 bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30"
                           >
-                            <Sparkles className="size-3" />
-                            {isDraftingSingle ? "Drafting…" : "Regenerate angle with AI"}
-                          </Button>
+                            Connect Mailbox
+                          </Link>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-4">
+                      {activeItem.intel.linkedin_url && (
+                        <div className="flex items-center justify-between rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
+                          <span className="text-xs text-sky-300">
+                            Verified LinkedIn destination ready.
+                          </span>
+                          <a
+                            href={activeItem.intel.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-600"
+                          >
+                            <Linkedin className="size-3.5" />
+                            Open Profile in LinkedIn <ExternalLink className="size-3" />
+                          </a>
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <Label htmlFor="linkedin-note" className="text-xs font-semibold text-foreground">
+                            Connection Request Note (under 300 characters)
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "text-[11px] font-mono",
+                                customLinkedinNote.length <= 300 ? "text-emerald-400" : "text-rose-400 font-semibold",
+                              )}
+                            >
+                              {customLinkedinNote.length}/300 chars
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyText("linkedin-note", customLinkedinNote)}
+                              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                            >
+                              {copiedKey === "linkedin-note" ? (
+                                <Check className="size-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="size-3" />
+                              )}
+                              Copy Note
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          id="linkedin-note"
+                          rows={3}
+                          value={customLinkedinNote}
+                          onChange={(e) => setCustomLinkedinNote(e.target.value)}
+                          className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-sky-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <Label htmlFor="linkedin-message" className="text-xs font-semibold text-foreground">
+                            InMail / Direct Message Pitch (2-3 sentences)
+                          </Label>
                           <button
                             type="button"
-                            onClick={() => copyText("pitch-subject", customSubject)}
+                            onClick={() => copyText("linkedin-msg", customLinkedinMessage)}
                             className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
                           >
-                            {copiedKey === "pitch-subject" ? (
+                            {copiedKey === "linkedin-msg" ? (
                               <Check className="size-3 text-emerald-400" />
                             ) : (
                               <Copy className="size-3" />
                             )}
-                            Copy
+                            Copy InMail
                           </button>
                         </div>
+                        <textarea
+                          id="linkedin-message"
+                          rows={6}
+                          value={customLinkedinMessage}
+                          onChange={(e) => setCustomLinkedinMessage(e.target.value)}
+                          className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-sky-500 focus:outline-none"
+                        />
                       </div>
-                      <Input
-                        id="pitch-subject"
-                        value={customSubject}
-                        onChange={(e) => setCustomSubject(e.target.value)}
-                        className="font-mono text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <Label htmlFor="pitch-body" className="text-xs font-semibold text-foreground">
-                          Personalized outreach body
-                        </Label>
-                        <button
-                          type="button"
-                          onClick={() => copyText("pitch-body", customBody)}
-                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
-                        >
-                          {copiedKey === "pitch-body" ? (
-                            <Check className="size-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                          Copy
-                        </button>
-                      </div>
-                      <textarea
-                        id="pitch-body"
-                        rows={8}
-                        value={customBody}
-                        onChange={(e) => setCustomBody(e.target.value)}
-                        className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-primary focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {activeMailbox ? (
-                    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300">
-                      <ShieldCheck className="size-4 shrink-0 text-emerald-400" />
-                      <span className="min-w-0 break-words">
-                        Sending from your connected agency mailbox:{" "}
-                        <strong className="font-mono text-foreground">{activeMailbox.email}</strong>{" "}
-                        ({activeMailbox.appName})
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-300">
-                      <div className="flex items-center gap-2">
-                        <Mail className="size-4 shrink-0 text-amber-400" />
-                        <span>No client mailbox connected. Connect your Google Workspace, Outlook, or SMTP to send.</span>
-                      </div>
-                      <Link
-                        href="/dashboard/connectors"
-                        className="rounded-md border border-amber-500/40 bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30"
-                      >
-                        Connect Mailbox
-                      </Link>
                     </div>
                   )}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/40 px-5 py-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={saveDraft.isPending}
-                    onClick={() =>
-                      saveDraft.run({
-                        id: activeItem.opp.id,
-                        subject: customSubject,
-                        body: customBody,
-                      })
-                    }
-                    className="text-xs"
-                  >
-                    {saveDraft.isPending ? "Saving…" : "Save custom angles"}
-                  </Button>
+                  {activeChannel === "email" ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={saveDraft.isPending}
+                        onClick={() =>
+                          saveDraft.run({
+                            id: activeItem.opp.id,
+                            subject: customSubject,
+                            body: customBody,
+                          })
+                        }
+                        className="text-xs"
+                      >
+                        {saveDraft.isPending ? "Saving…" : "Save custom angles"}
+                      </Button>
 
-                  <Button
-                    disabled={isSending || !activeMailbox || !recipientEmail || !recipientEmail.includes("@")}
-                    onClick={() =>
-                      handleSendSingle(
-                        activeItem.opp.id,
-                        recipientEmail,
-                        customSubject,
-                        customBody,
-                      )
-                    }
-                    className="h-10 gap-2 px-5 text-sm"
-                  >
-                    <Send className="size-4" />
-                    {isSending
-                      ? "Dispatching…"
-                      : activeItem.opp.outreach_dispatched
-                        ? "Resend outreach"
-                        : "Approve & send now"}
-                  </Button>
+                      <Button
+                        disabled={isSending || !activeMailbox || !recipientEmail || !recipientEmail.includes("@")}
+                        onClick={() =>
+                          handleSendSingle(
+                            activeItem.opp.id,
+                            recipientEmail,
+                            customSubject,
+                            customBody,
+                          )
+                        }
+                        className="h-10 gap-2 px-5 text-sm"
+                      >
+                        <Send className="size-4" />
+                        {isSending
+                          ? "Dispatching…"
+                          : activeItem.opp.outreach_dispatched
+                            ? "Resend outreach"
+                            : "Approve & send now"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={markContacted.isPending}
+                        onClick={() =>
+                          markContacted.run({
+                            id: activeItem.opp.id,
+                            stage: "Screening",
+                          })
+                        }
+                        className="gap-1.5 text-xs"
+                      >
+                        <MessageSquare className="size-3.5" />
+                        {markContacted.isPending ? "Updating…" : "Mark as Contacted on LinkedIn"}
+                      </Button>
+
+                      {activeItem.intel.linkedin_url && (
+                        <a
+                          href={activeItem.intel.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-10 items-center gap-2 rounded-xl bg-sky-500 px-5 text-sm font-semibold text-white transition hover:bg-sky-600"
+                        >
+                          <Linkedin className="size-4" />
+                          Open LinkedIn & Send Note
+                        </a>
+                      )}
+                    </>
+                  )}
                 </div>
               </Panel>
             ) : null}

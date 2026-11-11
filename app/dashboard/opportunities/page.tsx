@@ -439,16 +439,6 @@ function Dossier({
             <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
               {intel.intent_level}
             </span>
-            {intel.trigger_url && /^https?:\/\//i.test(intel.trigger_url) && (
-              <a
-                href={intel.trigger_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                Source Requisition <ExternalLink className="size-3" />
-              </a>
-            )}
           </div>
         </Panel>
 
@@ -706,19 +696,13 @@ function Dossier({
       <TabsContent value="audit" className="space-y-4 pt-4">
         <Panel>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-            Verification & Attribution
+            Verification Status
           </span>
           <div className="mt-3 space-y-2 text-xs">
             <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 text-muted-foreground">Audit Tag:</span>
+              <span className="shrink-0 text-muted-foreground">Status:</span>
               <span className="break-words text-right font-medium text-emerald-400">
                 {intel.verification_status}
-              </span>
-            </div>
-            <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 text-muted-foreground">Source Attribution:</span>
-              <span className="min-w-0 break-all text-right font-mono text-muted-foreground">
-                {intel.source_attribution}
               </span>
             </div>
           </div>

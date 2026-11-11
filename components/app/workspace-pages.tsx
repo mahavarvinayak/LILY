@@ -1169,23 +1169,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         <span className="font-mono text-foreground">{currentIntel.trigger_age || "Active"}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">22. Proof Link</span>
-                        {currentIntel.trigger_url ? (
-                          <a
-                            href={currentIntel.trigger_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-primary hover:underline"
-                          >
-                            Primary Proof Trail
-                            <ExternalLink className="size-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-                      <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">23. Intent Level</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">22. Intent Level</span>
                         <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
                           {currentIntel.intent_level}
                         </span>
