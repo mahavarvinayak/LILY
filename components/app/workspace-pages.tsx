@@ -551,14 +551,22 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         </td>
                         <td className={tableClasses.td}>
                           {c.industry ? (
-                            <Pill tone="violet">{c.industry}</Pill>
+                            <Pill
+                              tone="violet"
+                              title={c.industry}
+                              className="max-w-[190px] rounded-lg py-1 text-left leading-4 whitespace-normal"
+                            >
+                              <span className="line-clamp-2 break-words">{c.industry}</span>
+                            </Pill>
                           ) : (
                             <span className="shrink-0 text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className={tableClasses.td}>
                           {c.employee_count ? (
-                            <Pill tone="neutral">{c.employee_count}</Pill>
+                            <Pill tone="neutral" className="whitespace-nowrap">
+                              {c.employee_count}
+                            </Pill>
                           ) : (
                             <span className="shrink-0 text-xs text-muted-foreground">—</span>
                           )}
