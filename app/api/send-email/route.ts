@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 import nodemailer from "nodemailer";
-import { env, isResendConfigured } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { decryptPassword, type EncryptedSecret } from "@/lib/smtp-crypto";
 import { escapeHtml } from "@/lib/html";
 import { validateHostForSsrf } from "@/lib/ssrf";
+import { getConnectedMailboxes, sendComposioOutreach } from "@/lib/composio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -188,31 +187,25 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!isResendConfigured()) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "No email dispatch service is configured. Please connect a Custom SMTP mailbox in Connectors.",
-      },
-      { status: 503 },
-    );
-  }
+  const composioMailboxes = await getConnectedMailboxes(userId);
+  const activeComposio = composioMailboxes.find(
+    (m) => m.status === "active" && (m.provider === "gmail" || m.provider === "outlook"),
+  );
 
-  const resend = new Resend(env.resendApiKey);
-  const replyTo = profile?.contact_email || env.resendFromEmail.replace(/.*<(.+)>.*/, "$1");
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: env.resendFromEmail,
-      to: [to],
+  if (activeComposio) {
+    const provider = activeComposio.provider === "outlook" ? "outlook" : "gmail";
+    const composioResult = await sendComposioOutreach(userId, {
+      to,
       subject,
-      html: renderHtml(body),
-      text: body,
-      replyTo,
+      body,
+      provider,
     });
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 502 });
+    if (!composioResult.ok) {
+      return NextResponse.json(
+        { ok: false, error: composioResult.error || "Failed to dispatch via connected mailbox." },
+        { status: 502 },
+      );
     }
 
     if (opportunityId !== "test-verification") {
@@ -226,19 +219,24 @@ export async function POST(request: Request) {
         user_id: userId,
         action: "email_dispatched",
         title: `Outreach Sent: ${to}`,
-        description: `Subject: "${subject}" via Resend.`,
-        metadata: { opportunityId, to, subject, provider: "resend" },
+        description: `Subject: "${subject}" via connected ${activeComposio.appName}.`,
+        metadata: { opportunityId, to, subject, provider: activeComposio.provider },
       });
     }
 
     return NextResponse.json({
       ok: true,
-      id: data?.id,
-      provider: "resend",
-      message: `Email dispatched to ${to}.`,
+      provider: activeComposio.provider,
+      message: `Outreach dispatched directly from ${activeComposio.email} via ${activeComposio.appName}.`,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Resend request failed.";
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error:
+        "No sender mailbox connected. Please connect your Gmail, Outlook, or Custom SMTP mailbox in Connectors to send outreach from your own agency address.",
+    },
+    { status: 400 },
+  );
 }

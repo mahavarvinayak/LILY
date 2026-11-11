@@ -1,5 +1,9 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { Linkedin, Mail, Globe, ExternalLink, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 /**
@@ -238,12 +242,12 @@ export function stageToneFor(stage: string): Tone {
 }
 
 export const tableClasses = {
-  table: "w-full min-w-[900px] border-separate border-spacing-0 text-left text-sm",
+  table: "w-full min-w-[1300px] border-separate border-spacing-0 text-left text-sm",
   headRow: "",
-  th: "sticky top-0 z-10 border-b border-border-strong bg-surface px-4 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted-foreground",
+  th: "sticky top-0 z-10 border-b border-border-strong bg-surface px-4 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-muted-foreground whitespace-nowrap",
   tbody: "",
   row: "group transition-colors odd:bg-white/[0.018] hover:bg-primary/[0.05]",
-  td: "border-b border-border px-4 py-4 align-top group-last:border-0",
+  td: "border-b border-border px-4 py-4 align-middle group-last:border-0",
 };
 
 export function Meta({ label, value }: { label: string; value: ReactNode }) {
@@ -253,6 +257,112 @@ export function Meta({ label, value }: { label: string; value: ReactNode }) {
         {label}
       </p>
       <div className="mt-1 text-[13px] leading-5 text-foreground">{value || "—"}</div>
+    </div>
+  );
+}
+
+export function ChannelBadge({
+  kind,
+  value,
+  label,
+  compact = false,
+}: {
+  kind: "linkedin" | "email" | "website";
+  value?: string | null;
+  label?: string;
+  compact?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!value || !value.trim()) {
+    return (
+      <span className="inline-flex items-center rounded-md border border-border bg-surface px-2 py-0.5 text-[11px] text-muted-foreground">
+        {kind === "email" ? "Email unlisted" : kind === "linkedin" ? "No LinkedIn" : "No site"}
+      </span>
+    );
+  }
+
+  const cleanVal = value.trim();
+  const href =
+    kind === "email"
+      ? `mailto:${cleanVal}`
+      : kind === "website" && !/^https?:\/\//i.test(cleanVal)
+        ? `https://${cleanVal}`
+        : cleanVal;
+
+  const displayLabel =
+    label ||
+    (kind === "website"
+      ? cleanVal.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "")
+      : kind === "email"
+        ? cleanVal
+        : "LinkedIn");
+
+  function handleCopy(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    void navigator.clipboard.writeText(cleanVal);
+    setCopied(true);
+    toast.success(`Copied ${kind === "email" ? "email address" : kind === "linkedin" ? "LinkedIn URL" : "website URL"}`);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const colors =
+    kind === "linkedin"
+      ? "border-sky-500/35 bg-sky-500/10 text-sky-300 hover:border-sky-400 hover:bg-sky-500/20"
+      : kind === "email"
+        ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-500/20"
+        : "border-primary/35 bg-primary/10 text-primary hover:border-primary/50 hover:bg-primary/20";
+
+  const Icon = kind === "linkedin" ? Linkedin : kind === "email" ? Mail : Globe;
+
+  return (
+    <div className="group/chan relative inline-block">
+      <a
+        href={href}
+        target={kind === "email" ? undefined : "_blank"}
+        rel={kind === "email" ? undefined : "noopener noreferrer"}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-lg border font-mono text-[11px] font-medium transition-all shadow-sm",
+          compact ? "px-2 py-1" : "px-2.5 py-1.5 max-w-[200px]",
+          colors,
+        )}
+      >
+        <Icon className="size-3.5 shrink-0" />
+        <span className="truncate">{displayLabel}</span>
+        {kind !== "email" && <ExternalLink className="size-2.5 shrink-0 opacity-60" />}
+      </a>
+
+      <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-xl border border-border-strong bg-card p-3 shadow-2xl backdrop-blur-md opacity-0 transition-all duration-150 group-hover/chan:pointer-events-auto group-hover/chan:visible group-hover/chan:opacity-100">
+        <div className="flex items-center justify-between border-b border-border pb-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
+            {kind === "linkedin" ? "LinkedIn Profile" : kind === "email" ? "Verified Email" : "Official Website"}
+          </span>
+          <span className="text-[10px] text-primary">Direct link</span>
+        </div>
+        <p className="mt-2 break-all font-mono text-[11px] leading-relaxed text-foreground">
+          {cleanVal}
+        </p>
+        <div className="mt-2.5 flex items-center justify-end gap-1.5 pt-1">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-surface px-2 text-[10px] font-medium text-foreground hover:bg-surface-elevated"
+          >
+            {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <a
+            href={href}
+            target={kind === "email" ? undefined : "_blank"}
+            rel={kind === "email" ? undefined : "noopener noreferrer"}
+            className="inline-flex h-6 items-center gap-1 rounded-md border border-primary/40 bg-primary/15 px-2 text-[10px] font-medium text-primary hover:bg-primary/25"
+          >
+            {kind === "email" ? "Mailto" : "Open"}
+            <ExternalLink className="size-2.5" />
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

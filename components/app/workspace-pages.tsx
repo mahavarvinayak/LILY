@@ -7,10 +7,8 @@ import {
   ArrowUpRight,
   Download,
   Users,
-  Mail,
   Copy,
   Check,
-  Linkedin,
   Send,
   Search,
   MapPin,
@@ -60,6 +58,7 @@ import {
   SectionHeading,
   TierPill,
   PriorityPill,
+  ChannelBadge,
   stageToneFor,
   tableClasses,
   type Tone,
@@ -490,197 +489,183 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
               <table className={tableClasses.table}>
                 <thead>
                   <tr>
-                    <th className={cn(tableClasses.th, "w-[26%]")}>Account</th>
-                    <th className={cn(tableClasses.th, "w-[23%]")}>Buying signal</th>
-                    <th className={cn(tableClasses.th, "w-[15%]")}>Firmographics</th>
-                    <th className={cn(tableClasses.th, "w-[23%]")}>Decision makers</th>
-                    <th className={cn(tableClasses.th, "w-[13%]")}>Pipeline</th>
+                    <th className={tableClasses.th}>Company</th>
+                    <th className={tableClasses.th}>Website</th>
+                    <th className={tableClasses.th}>Company LinkedIn</th>
+                    <th className={tableClasses.th}>HQ Location</th>
+                    <th className={tableClasses.th}>Industry</th>
+                    <th className={tableClasses.th}>Headcount</th>
+                    <th className={tableClasses.th}>Buying Signal</th>
+                    <th className={tableClasses.th}>Primary Leader</th>
+                    <th className={tableClasses.th}>Multi-Threading</th>
+                    <th className={tableClasses.th}>Active Pipeline</th>
                     <th className={cn(tableClasses.th, "text-right")}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCompanies.map((c) => (
-                    <tr key={c.id} className={tableClasses.row}>
-                      <td
-                        className={cn(
-                          tableClasses.td,
-                          "border-l-2 border-l-transparent transition-colors group-hover:border-l-primary/70",
-                        )}
-                      >
-                        <div className="flex items-start gap-3">
-                          <CompanyFavicon
-                            domain={c.domain}
-                            website={c.website}
-                            name={c.name}
-                            size={40}
-                          />
-                          <div className="min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => setInspectId(c.id)}
-                              className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-primary hover:underline"
-                            >
-                              {c.name}
-                            </button>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                              {c.website && (
-                                <a
-                                  href={c.website}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 font-mono hover:text-primary"
-                                >
-                                  {c.website.replace(/^https?:\/\//, "")}
-                                  <ExternalLink className="size-2.5" />
-                                </a>
-                              )}
-                              {c.linkedin_url && (
-                                <a
-                                  href={c.linkedin_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-sky-300 hover:text-sky-200"
-                                >
-                                  <Linkedin className="size-3" />
-                                  Company page
-                                </a>
-                              )}
-                              <span className="inline-flex items-center gap-1">
-                                <MapPin className="size-3" />
-                                {c.location}
-                              </span>
+                  {filteredCompanies.map((c) => {
+                    const primaryContact = c.contacts.find((p) => p.role_tier === "primary") || c.contacts[0];
+                    const secContact = c.contacts.find((p) => p.role_tier !== "primary") || (c.contacts.length > 1 ? c.contacts[1] : null);
+
+                    return (
+                      <tr key={c.id} className={tableClasses.row}>
+                        <td
+                          className={cn(
+                            tableClasses.td,
+                            "border-l-2 border-l-transparent transition-colors group-hover:border-l-primary/70",
+                          )}
+                        >
+                          <div className="flex items-center gap-3 min-w-[200px]">
+                            <CompanyFavicon
+                              domain={c.domain}
+                              website={c.website}
+                              name={c.name}
+                              size={36}
+                            />
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setInspectId(c.id)}
+                                className="text-left text-sm font-semibold leading-5 text-foreground hover:text-primary hover:underline truncate block"
+                              >
+                                {c.name}
+                              </button>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className={tableClasses.td}>
-                        {c.intel?.buying_trigger ? (
-                          <div className="space-y-2">
-                            <p className="line-clamp-2 text-[13px] font-medium leading-5 text-foreground">
-                              {c.intel.buying_trigger}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Pill tone={intentTone(c.intel.intent_level)}>
-                                {c.intel.intent_level}
-                              </Pill>
-                              {c.intel.trigger_age && (
-                                <Pill tone="neutral">{c.intel.trigger_age}</Pill>
-                              )}
-                            </div>
+                        </td>
+                        <td className={tableClasses.td}>
+                          <ChannelBadge kind="website" value={c.website} />
+                        </td>
+                        <td className={tableClasses.td}>
+                          <ChannelBadge kind="linkedin" value={c.linkedin_url} label="Company page" />
+                        </td>
+                        <td className={tableClasses.td}>
+                          <div className="inline-flex items-center gap-1.5 text-xs text-foreground whitespace-nowrap">
+                            <MapPin className="size-3 text-muted-foreground shrink-0" />
+                            {c.location || "—"}
                           </div>
-                        ) : (
-                          <span className="text-xs italic text-muted-foreground">
-                            No verified trigger yet
-                          </span>
-                        )}
-                      </td>
-                      <td className={tableClasses.td}>
-                        <div className="flex flex-col items-start gap-1.5">
+                        </td>
+                        <td className={tableClasses.td}>
                           {c.industry ? (
                             <Pill tone="violet">{c.industry}</Pill>
                           ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Industry unlisted
-                            </span>
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
-                          {c.employee_count && (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <Users className="size-3" />
-                              {c.employee_count} headcount
-                            </span>
+                        </td>
+                        <td className={tableClasses.td}>
+                          {c.employee_count ? (
+                            <Pill tone="neutral">{c.employee_count}</Pill>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
-                        </div>
-                      </td>
-                      <td className={tableClasses.td}>
-                        {c.contacts.length ? (
-                          <div className="space-y-2">
-                            {c.contacts.map((p) => (
-                              <div key={p.id} className="flex items-start gap-2">
-                                <TierPill tier={p.role_tier} />
-                                <div className="min-w-0">
-                                  <p className="text-[13px] font-medium leading-4 text-foreground">
-                                    {p.first_name} {p.last_name || ""}
-                                  </p>
-                                  <p className="truncate text-[11px] leading-4 text-muted-foreground">
-                                    {p.job_title}
-                                  </p>
-                                </div>
-                                <div className="ml-auto flex shrink-0 items-center gap-1">
-                                  {p.linkedin_url && (
-                                    <a
-                                      href={p.linkedin_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      aria-label={`LinkedIn profile for ${p.first_name}`}
-                                      className="grid size-6 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:border-sky-500/40 hover:text-sky-300"
-                                    >
-                                      <Linkedin className="size-3" />
-                                    </a>
-                                  )}
-                                  {p.email && (
-                                    <button
-                                      type="button"
-                                      aria-label={`Copy email for ${p.first_name}`}
-                                      onClick={() => copyText(`c-email-${p.id}`, p.email!)}
-                                      className="grid size-6 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                                    >
-                                      {copiedKey === `c-email-${p.id}` ? (
-                                        <Check className="size-3 text-emerald-400" />
-                                      ) : (
-                                        <Copy className="size-3" />
-                                      )}
-                                    </button>
-                                  )}
-                                </div>
+                        </td>
+                        <td className={tableClasses.td}>
+                          {c.intel?.buying_trigger ? (
+                            <div className="space-y-1.5 min-w-[260px] max-w-[320px]">
+                              <p className="line-clamp-2 text-xs font-medium leading-relaxed text-foreground">
+                                {c.intel.buying_trigger}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Pill tone={intentTone(c.intel.intent_level)}>
+                                  {c.intel.intent_level || "Standard Intent"}
+                                </Pill>
+                                {c.intel.trigger_age && (
+                                  <Pill tone="neutral">{c.intel.trigger_age}</Pill>
+                                )}
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-xs italic text-muted-foreground">
-                            No linked contact
-                          </span>
-                        )}
-                      </td>
-                      <td className={tableClasses.td}>
-                        {c.opportunity ? (
-                          <div className="space-y-1.5">
-                            <Link
-                              href={`/dashboard/opportunities?lead=${c.opportunity.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            </div>
+                          ) : (
+                            <span className="text-xs italic text-muted-foreground">
+                              No verified trigger yet
+                            </span>
+                          )}
+                        </td>
+                        <td className={tableClasses.td}>
+                          {primaryContact ? (
+                            <div className="space-y-1.5 min-w-[200px]">
+                              <div className="flex items-center gap-1.5">
+                                <TierPill tier="primary" />
+                                <span className="text-xs font-semibold text-foreground truncate">
+                                  {primaryContact.first_name} {primaryContact.last_name || ""}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {primaryContact.job_title}
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <ChannelBadge kind="linkedin" value={primaryContact.linkedin_url} compact />
+                                <ChannelBadge kind="email" value={primaryContact.email} compact />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs italic text-muted-foreground">
+                              No linked contact
+                            </span>
+                          )}
+                        </td>
+                        <td className={tableClasses.td}>
+                          {secContact ? (
+                            <div className="space-y-1.5 min-w-[190px]">
+                              <div className="flex items-center gap-1.5">
+                                <TierPill tier={secContact.role_tier} />
+                                <span className="text-xs font-semibold text-foreground truncate">
+                                  {secContact.first_name} {secContact.last_name || ""}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {secContact.job_title}
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <ChannelBadge kind="linkedin" value={secContact.linkedin_url} compact />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/60">
+                              Solo decision maker
+                            </span>
+                          )}
+                        </td>
+                        <td className={tableClasses.td}>
+                          {c.opportunity ? (
+                            <div className="space-y-1 min-w-[150px]">
+                              <Link
+                                href={`/dashboard/opportunities?lead=${c.opportunity.id}`}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline truncate max-w-[180px]"
+                              >
+                                {c.opportunity.deal_name}
+                                <ArrowUpRight className="size-3" />
+                              </Link>
+                              <p className="text-[11px] text-muted-foreground">
+                                {formatInr(c.opportunity.deal_value, true)} ·{" "}
+                                <span className={STAGE_META[c.opportunity.stage]?.tone}>
+                                  {c.opportunity.stage}
+                                </span>
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className={cn(tableClasses.td, "text-right")}>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1 text-xs"
+                              onClick={() => setInspectId(c.id)}
                             >
-                              {c.opportunity.deal_name}
+                              Inspect
                               <ArrowUpRight className="size-3" />
-                            </Link>
-                            <p className="text-[11px] text-muted-foreground">
-                              {formatInr(c.opportunity.deal_value, true)} ·{" "}
-                              <span className={STAGE_META[c.opportunity.stage]?.tone}>
-                                {c.opportunity.stage}
-                              </span>
-                            </p>
+                            </Button>
+                            <DeleteButton
+                              label="company"
+                              onDelete={() => void dc.run(c.id)}
+                            />
                           </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className={cn(tableClasses.td, "text-right")}>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1 text-xs"
-                            onClick={() => setInspectId(c.id)}
-                          >
-                            Inspect
-                            <ArrowUpRight className="size-3" />
-                          </Button>
-                          <DeleteButton
-                            label="company"
-                            onDelete={() => void dc.run(c.id)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -698,11 +683,15 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
             <table className={tableClasses.table}>
               <thead>
                 <tr>
-                  <th className={cn(tableClasses.th, "w-[24%]")}>Decision maker</th>
-                  <th className={cn(tableClasses.th, "w-[20%]")}>Account</th>
-                  <th className={cn(tableClasses.th, "w-[23%]")}>Buying signal</th>
-                  <th className={cn(tableClasses.th, "w-[21%]")}>Direct channels</th>
-                  <th className={cn(tableClasses.th, "w-[12%]")}>Pipeline</th>
+                  <th className={tableClasses.th}>Decision Maker</th>
+                  <th className={tableClasses.th}>Designation</th>
+                  <th className={tableClasses.th}>Company</th>
+                  <th className={tableClasses.th}>Website</th>
+                  <th className={tableClasses.th}>LinkedIn Profile</th>
+                  <th className={tableClasses.th}>Work Email</th>
+                  <th className={tableClasses.th}>HQ Location</th>
+                  <th className={tableClasses.th}>Buying Signal</th>
+                  <th className={tableClasses.th}>Active Pipeline</th>
                   <th className={cn(tableClasses.th, "text-right")}>Actions</th>
                 </tr>
               </thead>
@@ -715,44 +704,39 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         "border-l-2 border-l-transparent transition-colors group-hover:border-l-primary/70",
                       )}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="grid size-10 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 font-mono text-sm font-semibold text-primary">
+                      <div className="flex items-center gap-2.5 min-w-[180px]">
+                        <div className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 font-mono text-xs font-semibold text-primary">
                           {(p.name[0] || "P").toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setInspectId(p.id)}
-                              className="text-left text-[15px] font-semibold leading-5 text-foreground hover:text-primary hover:underline"
-                            >
-                              {p.name}
-                            </button>
-                            <TierPill tier={p.role_tier} />
-                          </div>
-                          <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            {p.title}
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setInspectId(p.id)}
+                            className="text-left text-sm font-semibold leading-5 text-foreground hover:text-primary hover:underline truncate block"
+                          >
+                            {p.name}
+                          </button>
+                          <TierPill tier={p.role_tier} />
                         </div>
                       </div>
                     </td>
                     <td className={tableClasses.td}>
+                      <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                        {p.title || "Executive"}
+                      </span>
+                    </td>
+                    <td className={tableClasses.td}>
                       {p.company ? (
-                        <div className="flex items-start gap-2.5">
+                        <div className="flex items-center gap-2 min-w-[170px]">
                           <CompanyFavicon
                             domain={p.company.domain}
                             website={p.company.website}
                             name={p.company.name}
-                            size={28}
+                            size={26}
                           />
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-medium leading-5 text-foreground">
-                              {p.company.name}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {p.company.location || "Location unlisted"}
-                            </p>
-                          </div>
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {p.company.name}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-xs italic text-muted-foreground">
@@ -761,14 +745,29 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       )}
                     </td>
                     <td className={tableClasses.td}>
+                      <ChannelBadge kind="website" value={p.company?.website} />
+                    </td>
+                    <td className={tableClasses.td}>
+                      <ChannelBadge kind="linkedin" value={p.linkedin_url} label="LinkedIn profile" />
+                    </td>
+                    <td className={tableClasses.td}>
+                      <ChannelBadge kind="email" value={p.email} label={p.email || undefined} />
+                    </td>
+                    <td className={tableClasses.td}>
+                      <div className="inline-flex items-center gap-1.5 text-xs text-foreground whitespace-nowrap">
+                        <MapPin className="size-3 text-muted-foreground shrink-0" />
+                        {p.company?.location || "—"}
+                      </div>
+                    </td>
+                    <td className={tableClasses.td}>
                       {p.intel?.buying_trigger ? (
-                        <div className="space-y-2">
-                          <p className="line-clamp-2 text-[13px] font-medium leading-5 text-foreground">
+                        <div className="space-y-1.5 min-w-[240px] max-w-[300px]">
+                          <p className="line-clamp-2 text-xs font-medium leading-relaxed text-foreground">
                             {p.intel.buying_trigger}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5">
                             <Pill tone={intentTone(p.intel.intent_level)}>
-                              {p.intel.intent_level}
+                              {p.intel.intent_level || "Standard Intent"}
                             </Pill>
                             {p.intel.trigger_age && (
                               <Pill tone="neutral">{p.intel.trigger_age}</Pill>
@@ -782,43 +781,11 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                       )}
                     </td>
                     <td className={tableClasses.td}>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {p.linkedin_url ? (
-                          <a
-                            href={p.linkedin_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-300 hover:bg-sky-500/20"
-                          >
-                            <Linkedin className="size-3" />
-                            LinkedIn
-                          </a>
-                        ) : null}
-                        {p.email ? (
-                          <button
-                            type="button"
-                            onClick={() => copyText(`p-email-${p.id}`, p.email)}
-                            className="inline-flex h-7 max-w-[210px] items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20"
-                            title="Copy work email"
-                          >
-                            {copiedKey === `p-email-${p.id}` ? (
-                              <Check className="size-3" />
-                            ) : (
-                              <Mail className="size-3" />
-                            )}
-                            <span className="truncate font-mono">{p.email}</span>
-                          </button>
-                        ) : (
-                          <Pill tone="neutral">Email unlisted</Pill>
-                        )}
-                      </div>
-                    </td>
-                    <td className={tableClasses.td}>
                       {p.opportunity ? (
-                        <div className="space-y-1.5">
+                        <div className="space-y-1 min-w-[140px]">
                           <Link
                             href={`/dashboard/opportunities?lead=${p.opportunity.id}`}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline truncate max-w-[170px]"
                           >
                             {p.opportunity.deal_name}
                             <ArrowUpRight className="size-3" />

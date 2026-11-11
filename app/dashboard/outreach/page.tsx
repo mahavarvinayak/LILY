@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Send,
@@ -44,6 +44,25 @@ export default function OutreachStudioPage() {
   const [isDraftingAll, setIsDraftingAll] = useState(false);
 
   const saveDraft = useWrite(api.updateDraft, "Outreach pitch saved");
+
+  const { data: mailboxData } = useQuery<{
+    ok: boolean;
+    mailboxes?: Array<{
+      id: string;
+      email: string;
+      appName: string;
+      status: string;
+      provider: string;
+    }>;
+  }>({
+    queryKey: ["connected-mailboxes"],
+    queryFn: async () => {
+      const res = await fetch("/api/composio/status");
+      return res.json();
+    },
+  });
+
+  const activeMailbox = mailboxData?.mailboxes?.find((m) => m.status === "active");
 
   const verifiedLeads = d.opportunities
     .map((opp) => {
@@ -506,15 +525,29 @@ export default function OutreachStudioPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2 rounded-lg border border-border bg-surface/60 px-3 py-2.5 text-[11px] leading-4 text-muted-foreground">
-                    <Mail className="mt-0.5 size-3.5 shrink-0" />
-                    <span>
-                      Sends through your connected Custom SMTP or Composio mailbox.{" "}
-                      <Link href="/dashboard/connectors" className="font-semibold text-primary hover:underline">
-                        Manage connectors
+                  {activeMailbox ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300">
+                      <ShieldCheck className="size-4 shrink-0 text-emerald-400" />
+                      <span>
+                        Sending from your connected agency mailbox:{" "}
+                        <strong className="font-mono text-foreground">{activeMailbox.email}</strong>{" "}
+                        ({activeMailbox.appName})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-300">
+                      <div className="flex items-center gap-2">
+                        <Mail className="size-4 shrink-0 text-amber-400" />
+                        <span>No client mailbox connected. Connect your Google Workspace, Outlook, or SMTP to send.</span>
+                      </div>
+                      <Link
+                        href="/dashboard/connectors"
+                        className="rounded-md border border-amber-500/40 bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30"
+                      >
+                        Connect Mailbox
                       </Link>
-                    </span>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/40 px-5 py-4">
@@ -535,7 +568,7 @@ export default function OutreachStudioPage() {
                   </Button>
 
                   <Button
-                    disabled={isSending}
+                    disabled={isSending || !activeMailbox}
                     onClick={() =>
                       handleSendSingle(
                         activeItem.opp.id,

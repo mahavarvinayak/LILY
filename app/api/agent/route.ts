@@ -3,6 +3,7 @@ import { agentReply, generateDrafts, type DraftLead } from "@/lib/ai";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendSlackDigest } from "@/lib/slack";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { ASSISTANT_SKILLS } from "@/lib/assistant-skills";
 import type { AgentResult, OpportunityRecord, Profile } from "@/types";
 
 export const runtime = "nodejs";
@@ -278,6 +279,28 @@ export async function POST(request: Request) {
     } satisfies AgentResult);
   }
 
+  const rawCmd = (command || (input.startsWith("/") ? input.split(/\s+/)[0] : "")).toLowerCase();
+  const matchedSkill = ASSISTANT_SKILLS.find(
+    (s) => s.command.toLowerCase() === rawCmd || s.id.toLowerCase() === rawCmd.replace(/^\//, ""),
+  );
+
+  if (matchedSkill) {
+    const query = input.replace(new RegExp(`^${rawCmd}\\s*`, "i"), "").trim();
+    const resultText = matchedSkill.run({
+      query,
+      agencyName: profile.agency_name,
+      targetOpp: null,
+      allOpps: opportunities,
+      pipelineValue,
+    });
+    return NextResponse.json({
+      ok: true,
+      command: matchedSkill.id,
+      message: resultText,
+      demo: false,
+    } satisfies AgentResult);
+  }
+
   if (command === "/filter" || /^\/filter\b/i.test(input)) {
     const keyword = input.replace(/^\/filter\s*/i, "").trim();
     return NextResponse.json({
@@ -291,11 +314,11 @@ export async function POST(request: Request) {
     } satisfies AgentResult);
   }
 
-  if (command === "/help") {
+  if (command === "/help" || input === "/help") {
+    const skillList = ASSISTANT_SKILLS.map((s) => `• \`${s.command}\` — ${s.name}: ${s.description}`).join("\n");
     return NextResponse.json({
       ok: true,
-      message:
-        "Try /draft-all to refresh today's pitches, /notify-slack to post the drop, /re-engage for stalled deals, or /filter hiring to slice the board.",
+      message: `### LILY Intelligence Outbound Skills & Slash Commands\n\n${skillList}\n\n• \`/draft-all\` — Bulk draft pitches for today's drop\n• \`/notify-slack\` — Post morning drop to Slack\n• \`/filter <query>\` — Filter live pipeline`,
       demo: false,
     } satisfies AgentResult);
   }
