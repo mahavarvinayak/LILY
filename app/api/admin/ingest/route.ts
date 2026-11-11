@@ -107,6 +107,56 @@ function leadOrDefault(lead: IngestedLead, releaseAt: string, draft?: { subject:
 }
 
 export async function POST(request: Request) {
+  const demo = isDemoMode();
+
+  if (!demo && !isSupabaseConfigured()) {
+    // Fail closed: a missing database must never fall through to the demo
+    // store, which would skip operator authorization entirely.
+    return NextResponse.json(
+      { ok: false, error: "Workspace database is not configured on this deployment." },
+      { status: 503 },
+    );
+  }
+
+  // Authorise before reading the body: operator access is decided by the
+  // session, so an anonymous caller must never reach payload validation.
+  let adminClient: ReturnType<typeof createSupabaseAdminClient> = null;
+
+  if (!demo) {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) {
+      return NextResponse.json({ ok: false, error: "Supabase is not configured." }, { status: 500 });
+    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
+    }
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    const operator = profileRow as Profile | null;
+    if (
+      !operator ||
+      operator.role !== "super_admin" ||
+      !user.email ||
+      !(ALLOWED_OPERATOR_EMAILS as readonly string[]).includes(user.email.toLowerCase())
+    ) {
+      return NextResponse.json({ ok: false, error: "Operator access required." }, { status: 403 });
+    }
+
+    adminClient = createSupabaseAdminClient();
+    if (!adminClient) {
+      return NextResponse.json(
+        { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY is missing on the server." },
+        { status: 500 },
+      );
+    }
+  }
+
   let body: IngestBody;
   try {
     body = (await request.json()) as IngestBody;
@@ -152,54 +202,9 @@ export async function POST(request: Request) {
 
   const releaseAt = parseReleaseAt(body.releaseAt);
   const dailyQuota = Math.min(50, Math.max(1, Number(body.dailyQuota ?? 15) || 15));
-  const demo = isDemoMode();
-
-  if (!demo && !isSupabaseConfigured()) {
-    // Fail closed: a missing database must never fall through to the demo
-    // store, which would skip operator authorization entirely.
-    return NextResponse.json(
-      { ok: false, error: "Workspace database is not configured on this deployment." },
-      { status: 503 },
-    );
-  }
-
-  let adminClient: ReturnType<typeof createSupabaseAdminClient> = null;
   const clientId = body.clientId;
 
-  if (!demo) {
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) {
-      return NextResponse.json({ ok: false, error: "Supabase is not configured." }, { status: 500 });
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
-    }
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-    const operator = profileRow as Profile | null;
-    if (
-      !operator ||
-      operator.role !== "super_admin" ||
-      !user.email ||
-      !(ALLOWED_OPERATOR_EMAILS as readonly string[]).includes(user.email.toLowerCase())
-    ) {
-      return NextResponse.json({ ok: false, error: "Operator access required." }, { status: 403 });
-    }
-
-    adminClient = createSupabaseAdminClient();
-    if (!adminClient) {
-      return NextResponse.json(
-        { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY is missing on the server." },
-        { status: 500 },
-      );
-    }
-
+  if (adminClient) {
     if (!clientId) {
       return NextResponse.json({ ok: false, error: "Select a client workspace." }, { status: 400 });
     }

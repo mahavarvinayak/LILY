@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import crypto from "crypto";
 import { Resend } from "resend";
 import { env, isResendConfigured } from "@/lib/env";
@@ -14,41 +14,21 @@ type AccountLookup = "exists" | "missing" | "unknown";
 /**
  * Does this address own an account in `auth.users`?
  *
- * Uses the `auth_user_exists` RPC from migration 0005 (service-role only).
+ * Uses the `auth_user_exists` RPC (migration 0005, service-role only).
  * `profiles.contact_email` is a client-writable column, so it must never gate
  * delivery: `generateLink` would silently create an account for whatever
- * address it is handed. Before 0005 is applied the RPC is missing (PGRST202),
- * so we fall back to paging the admin user list.
+ * address it is handed. A lookup failure is treated as "unknown" and answered
+ * exactly like an unknown address — no mail, no account.
  */
 async function lookupAccount(admin: AdminClient, email: string): Promise<AccountLookup> {
   const { data, error } = await admin.rpc("auth_user_exists", { p_email: email });
 
-  if (!error) {
-    return data === true ? "exists" : "missing";
-  }
-
-  const code = (error as { code?: string }).code;
-  if (code !== "PGRST202") {
+  if (error) {
     console.error("[send-otp] auth_user_exists failed:", error.message);
     return "unknown";
   }
 
-  // TODO(0005): delete this fallback once the migration is applied everywhere.
-  console.warn("[send-otp] auth_user_exists is missing; falling back to admin user listing.");
-  const target = email.toLowerCase();
-  for (let page = 1; page <= 20; page += 1) {
-    const { data: listed, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (listError) {
-      console.error("[send-otp] user listing failed:", listError.message);
-      return "unknown";
-    }
-
-    const users = listed?.users ?? [];
-    if (users.some((user) => user.email?.toLowerCase() === target)) return "exists";
-    if (users.length < 1000) break;
-  }
-
-  return "missing";
+  return data === true ? "exists" : "missing";
 }
 
 export async function POST(request: Request) {
@@ -124,38 +104,7 @@ export async function POST(request: Request) {
       .eq("email", cleanEmail)
       .lt("expires_at", new Date().toISOString());
 
-    let tokenHash: string | null = null;
-    let verificationType = "magiclink";
-
-    if (accountExists) {
-      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-        type: "magiclink",
-        email: cleanEmail,
-      });
-
-      if (linkError) {
-        // Never echo the provider message, and fall through to the decoy path
-        // so a provider failure is indistinguishable from an unknown address.
-        console.error("[send-otp] generateLink failed:", linkError.message);
-      } else if (linkData?.properties?.hashed_token) {
-        tokenHash = linkData.properties.hashed_token;
-        verificationType = linkData.properties.verification_type || "magiclink";
-      }
-    }
-
-    const deliverable = tokenHash !== null;
-
-    if (!tokenHash) {
-      // Decoy challenge: same row shape, same cookie, same response, but no
-      // mail and no Supabase account. Without it this route leaks whether an
-      // address has a workspace (different message, missing cookie, and no
-      // attempt counter to burn).
-      tokenHash = crypto.randomBytes(32).toString("hex");
-      verificationType = "magiclink";
-    }
-
-    const codeNum = crypto.randomInt(100000, 1000000);
-    const code = codeNum.toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
 
     const codeHash = crypto
       .createHmac("sha256", secret)
@@ -164,13 +113,15 @@ export async function POST(request: Request) {
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
+    // A placeholder token keeps the row shape identical for both paths. For a
+    // real account the magic-link hash is written after the response (below).
     const { data: otpRow, error: otpError } = await admin
       .from("auth_otps")
       .insert({
         email: cleanEmail,
         code_hash: codeHash,
-        token_hash: tokenHash,
-        verification_type: verificationType,
+        token_hash: crypto.randomBytes(32).toString("hex"),
+        verification_type: "magiclink",
         attempts: 0,
         expires_at: expiresAt,
       })
@@ -181,11 +132,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Failed to store authentication challenge." }, { status: 500 });
     }
 
-    if (deliverable) {
-      const resend = new Resend(env.resendApiKey);
-      const fromAddress = env.resendFromEmail || "LILY <hello@thepilab.in>";
+    if (accountExists) {
+      // Everything slow runs after the response is flushed. The admin
+      // `generateLink` call plus the Resend round trip take hundreds of
+      // milliseconds, and doing them inline made a real address measurably
+      // slower than an unknown one — a timing oracle even with identical
+      // bodies, cookies and status codes.
+      after(async () => {
+        try {
+          const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+            type: "magiclink",
+            email: cleanEmail,
+          });
 
-      const htmlContent = `
+          const linkToken = linkData?.properties?.hashed_token;
+          if (linkError || !linkToken) {
+            await admin.from("auth_otps").delete().eq("id", otpRow.id);
+            console.error("[send-otp] generateLink failed:", linkError?.message ?? "missing hashed_token");
+            return;
+          }
+
+          const { error: tokenError } = await admin
+            .from("auth_otps")
+            .update({
+              token_hash: linkToken,
+              verification_type: linkData?.properties?.verification_type || "magiclink",
+            })
+            .eq("id", otpRow.id);
+
+          if (tokenError) {
+            await admin.from("auth_otps").delete().eq("id", otpRow.id);
+            console.error("[send-otp] could not store the magic-link token:", tokenError.message);
+            return;
+          }
+
+          const resend = new Resend(env.resendApiKey);
+          const fromAddress = env.resendFromEmail || "LILY <hello@thepilab.in>";
+
+          const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
@@ -219,23 +203,24 @@ export async function POST(request: Request) {
     </html>
     `;
 
-      const { error: resendError } = await resend.emails.send({
-        from: fromAddress,
-        to: [cleanEmail],
-        subject: `Your LILY sign-in code: ${code}`,
-        html: htmlContent,
-        text: `Your LILY sign-in verification code is: ${code}. It expires in 10 minutes.`,
-      });
+          const { error: resendError } = await resend.emails.send({
+            from: fromAddress,
+            to: [cleanEmail],
+            subject: `Your LILY sign-in code: ${code}`,
+            html: htmlContent,
+            text: `Your LILY sign-in verification code is: ${code}. It expires in 10 minutes.`,
+          });
 
-      if (resendError) {
-        // Never leave a challenge behind that the user never received.
-        await admin.from("auth_otps").delete().eq("id", otpRow.id);
-        console.error("[send-otp] Resend rejected the message:", resendError.message);
-        return NextResponse.json(
-          { ok: false, error: "We could not deliver the sign-in code. Please try again." },
-          { status: 502 },
-        );
-      }
+          if (resendError) {
+            // Never leave a challenge behind that the user never received.
+            await admin.from("auth_otps").delete().eq("id", otpRow.id);
+            console.error("[send-otp] Resend rejected the message:", resendError.message);
+          }
+        } catch (error) {
+          await admin.from("auth_otps").delete().eq("id", otpRow.id);
+          console.error("[send-otp] background delivery failed:", error);
+        }
+      });
     }
 
     // One message for every address, delivered or not: the response must not

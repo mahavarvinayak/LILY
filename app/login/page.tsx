@@ -19,9 +19,8 @@ function LoginFormInner() {
   const next = searchParams.get("next") ?? "/dashboard";
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
-  const [mode, setMode] = useState<"otp" | "password" | "signup">("otp");
+  const [mode, setMode] = useState<"otp" | "signup">("otp");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [agency, setAgency] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -35,43 +34,29 @@ function LoginFormInner() {
     });
   }, [router, safeNext]);
 
-  async function submitPassword(e: FormEvent) {
+  async function submitSignup(e: FormEvent) {
     e.preventDefault();
     setPending(true);
-    const supabase = createClient();
-    if (!supabase) {
-      toast.error("Authentication service is initializing. Please retry in a moment.");
-      setPending(false);
-      return;
-    }
 
     try {
-      if (mode === "password") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Welcome back.");
-        window.location.href = safeNext;
-      } else if (mode === "signup") {
-        // Accounts are passwordless: the only credential is the emailed code.
-        const signupRes = await fetch("/api/auth/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, agency }),
-        });
-        const signupData = await signupRes.json();
-        if (!signupRes.ok || !signupData.ok) {
-          throw new Error(signupData.error || "Could not create account.");
-        }
-
-        // Signup never yields a session: the account is opened through the
-        // emailed 6-digit code, so switch the form into OTP mode.
-        setMode("otp");
-        setOtpSent(false);
-        setPassword("");
-        toast.success(
-          signupData.message || "Workspace request received. Request a 6-digit code to sign in.",
-        );
+      // Accounts are passwordless: the only credential is the emailed code.
+      const signupRes = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, agency }),
+      });
+      const signupData = await signupRes.json();
+      if (!signupRes.ok || !signupData.ok) {
+        throw new Error(signupData.error || "Could not create account.");
       }
+
+      // Signup never yields a session: the account is opened through the
+      // emailed 6-digit code, so switch the form into OTP mode.
+      setMode("otp");
+      setOtpSent(false);
+      toast.success(
+        signupData.message || "Workspace request received. Request a 6-digit code to sign in.",
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Authentication failed.");
     } finally {
@@ -193,18 +178,12 @@ function LoginFormInner() {
           </div>
 
           <h1 className="text-4xl font-medium text-foreground">
-            {mode === "signup"
-              ? "Create your workspace"
-              : mode === "otp"
-                ? "Sign in to your pipeline"
-                : "Welcome back"}
+            {mode === "signup" ? "Create your workspace" : "Sign in to your pipeline"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {mode === "signup"
               ? "Passwordless — we verify you by email before your first lead drop."
-              : mode === "otp"
-                ? "Passwordless. We send a six-digit code to your agency email."
-                : "Enter your agency credentials to access your pipeline."}
+              : "Passwordless. We send a six-digit code to your agency email."}
           </p>
 
           <div className="mt-6 flex rounded-xl border border-border bg-surface p-1">
@@ -219,18 +198,6 @@ function LoginFormInner() {
               }`}
             >
               Email Code
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("password");
-                setOtpSent(false);
-              }}
-              className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition ${
-                mode === "password" ? "bg-background text-foreground shadow" : "text-muted-foreground"
-              }`}
-            >
-              Password
             </button>
             <button
               type="button"
@@ -301,20 +268,20 @@ function LoginFormInner() {
               </form>
             )
           ) : (
-            <form onSubmit={submitPassword} className="mt-6 grid gap-4">
-              {mode === "signup" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="agency">Agency name</Label>
-                  <Input
-                    id="agency"
-                    required
-                    value={agency}
-                    onChange={(e) => setAgency(e.target.value)}
-                    placeholder="Bloom Digital"
-                    className="h-11 bg-surface"
-                  />
-                </div>
-              )}
+            <form onSubmit={submitSignup} className="mt-6 grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="agency">Agency name</Label>
+                <Input
+                  id="agency"
+                  required
+                  minLength={2}
+                  maxLength={80}
+                  value={agency}
+                  onChange={(e) => setAgency(e.target.value)}
+                  placeholder="Bloom Digital"
+                  className="h-11 bg-surface"
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Work email</Label>
                 <Input
@@ -327,23 +294,9 @@ function LoginFormInner() {
                   className="h-11 bg-surface"
                 />
               </div>
-              {mode === "password" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="h-11 bg-surface"
-                  />
-                </div>
-              )}
               <Button type="submit" variant="bloom" size="xl" disabled={pending} className="mt-2 w-full">
                 {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {mode === "signup" ? "Create workspace" : "Sign in"}
+                Create workspace
               </Button>
             </form>
           )}

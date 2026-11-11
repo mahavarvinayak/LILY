@@ -95,6 +95,21 @@ function heuristicReply(
 }
 
 export async function POST(request: Request) {
+  // Authorise before reading the body: an anonymous caller must not be able to
+  // probe payload validation through status codes or error messages.
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Database service unavailable." }, { status: 503 });
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ ok: false, message: "Please sign in again." }, { status: 401 });
+  }
+
   let body: AgentBody;
   try {
     body = (await request.json()) as AgentBody;
@@ -110,19 +125,6 @@ export async function POST(request: Request) {
 
   if (input.length > 2000) {
     return NextResponse.json({ ok: false, message: "Input prompt is too long (maximum 2000 characters)." }, { status: 400 });
-  }
-
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return NextResponse.json({ ok: false, message: "Database service unavailable." }, { status: 503 });
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ ok: false, message: "Please sign in again." }, { status: 401 });
   }
 
   const userLimit = checkRateLimit(`agent:user:${user.id}`, 20, 60 * 1000);

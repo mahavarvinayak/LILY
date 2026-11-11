@@ -27,6 +27,21 @@ function renderHtml(body: string) {
 }
 
 export async function POST(request: Request) {
+  // Authorise before reading the body so an anonymous caller learns nothing
+  // from payload validation.
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, error: "Database service unavailable." }, { status: 500 });
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
+  }
+
   let payload: SendEmailBody;
   try {
     payload = (await request.json()) as SendEmailBody;
@@ -50,19 +65,6 @@ export async function POST(request: Request) {
   }
   if (!body || body.length > 8000) {
     return NextResponse.json({ ok: false, error: "Email body is empty or too long." }, { status: 400 });
-  }
-
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return NextResponse.json({ ok: false, error: "Database service unavailable." }, { status: 500 });
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
   }
 
   const userId = user.id;

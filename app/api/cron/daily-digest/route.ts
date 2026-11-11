@@ -9,21 +9,27 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DIGEST_TYPES = ["drop", "nudge", "wrap"] as const;
+type DigestType = (typeof DIGEST_TYPES)[number];
+
+function digestTypeOf(value: string | null | undefined): DigestType {
+  return DIGEST_TYPES.includes(value as DigestType) ? (value as DigestType) : "drop";
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const typeParam = url.searchParams.get("type") as "drop" | "nudge" | "wrap" | null;
-  return handleDigest(request, typeParam ?? "drop");
+  return handleDigest(request, digestTypeOf(url.searchParams.get("type")));
 }
 
 export async function POST(request: Request) {
-  let body: { type?: "drop" | "nudge" | "wrap" } = {};
+  let body: { type?: string } = {};
   try {
-    body = (await request.json()) as { type?: "drop" | "nudge" | "wrap" };
+    body = (await request.json()) as { type?: string };
   } catch {}
-  return handleDigest(request, body.type ?? "drop");
+  return handleDigest(request, digestTypeOf(body.type));
 }
 
-async function handleDigest(request: Request, digestType: "drop" | "nudge" | "wrap") {
+async function handleDigest(request: Request, digestType: DigestType) {
   const authHeader = (request.headers.get("authorization") || "").trim();
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -110,16 +116,63 @@ async function handleDigest(request: Request, digestType: "drop" | "nudge" | "wr
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
+  type DigestOpp = {
+    user_id: string;
+    deal_value: number | null;
+    outreach_dispatched: boolean | null;
+    scheduled_at: string;
+  };
+
+  const nowIso = new Date().toISOString();
+  const clientIds = clients.map((client) => client.id);
+
+  // One paginated query for every verified client instead of one per client.
+  // The filter is narrowed to the rows the chosen digest actually reports on,
+  // and paging keeps PostgREST's 1000-row cap from silently truncating a
+  // mature workspace (the cap used to hide rows behind a wrong pipeline total).
+  const allRows: DigestOpp[] = [];
+  const PAGE_SIZE = 1000;
+  const MAX_ROWS = 50000;
+
+  for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
+    let page = admin
+      .from("opportunities")
+      .select("user_id, deal_value, outreach_dispatched, scheduled_at")
+      .in("user_id", clientIds)
+      .lte("scheduled_at", nowIso);
+
+    if (digestType === "drop") {
+      page = page.gte("scheduled_at", startOfToday.toISOString());
+    } else if (digestType === "nudge") {
+      page = page.or("outreach_dispatched.is.null,outreach_dispatched.eq.false");
+    }
+
+    const { data, error } = await page
+      .order("scheduled_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("[daily-digest] could not load opportunities:", error.message);
+      return NextResponse.json({ ok: false, error: "Could not load pipelines for the digest." }, { status: 500 });
+    }
+
+    const rows = (data ?? []) as DigestOpp[];
+    allRows.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+  }
+
+  const byClient = new Map<string, DigestOpp[]>();
+  for (const opp of allRows) {
+    const existing = byClient.get(opp.user_id);
+    if (existing) existing.push(opp);
+    else byClient.set(opp.user_id, [opp]);
+  }
+
   const sentList: string[] = [];
 
   for (const client of clients) {
-    const { data: opps } = await admin
-      .from("opportunities")
-      .select("deal_value, stage, outreach_dispatched, scheduled_at")
-      .eq("user_id", client.id)
-      .lte("scheduled_at", new Date().toISOString());
-
-    const allOpps = opps ?? [];
+    const allOpps = byClient.get(client.id) ?? [];
     const releasedToday = allOpps.filter((o) => {
       const at = new Date(o.scheduled_at).getTime();
       return at >= startOfToday.getTime();
