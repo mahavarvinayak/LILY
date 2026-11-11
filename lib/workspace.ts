@@ -338,16 +338,16 @@ export const api = {
     );
   },
   async addTeamMember(input: { name: string; email: string; role: string }) {
-    const supabase = getSupabase();
-    const agency_id = await requireUserId();
-    const name = input.name.trim();
-    const email = input.email.trim().toLowerCase();
-    if (!name || !/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a name and a valid email.");
-    check(
-      await supabase
-        .from("team_members")
-        .insert({ agency_id, name, email, role: input.role, status: "Invited" }),
-    );
+    const res = await fetch("/api/team/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Failed to add team member.");
+    }
+    return data.member;
   },
   async updateTeamMember(input: { id: string; role?: string; status?: string }) {
     const supabase = getSupabase();

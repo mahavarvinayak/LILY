@@ -1443,7 +1443,7 @@ export function TeamPage() {
         icon={Users}
         tone="primary"
         title="Good work grows together."
-        description="Your agency roster. Adding a member records their details; it does not grant account access or send email."
+        description="Your agency sales roster. Adding a member sends a welcome notification to their email and tracks deal attribution."
         action={<CreateRecord kind="member" />}
       />
       {d.team_members?.length ? (

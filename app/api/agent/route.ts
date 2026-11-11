@@ -172,7 +172,7 @@ export async function POST(request: Request) {
 
   const isDraftCommand = command === "/draft-all" || /^\/draft\b/i.test(input) || /^draft\s+(all|pitches|leads)\b/i.test(input);
   const isSlackCommand = command === "/notify-slack" || /^\/slack\b/i.test(input) || /^(send|post)\s+(a\s+)?slack\s+(digest|update|alert)/i.test(input);
-  const isReengageCommand = command === "/re-engage" || /^\/re-?engage\b/i.test(input) || /^re-?engage\s+stalled/i.test(input);
+  const isReengageCommand = command === "/re-engage-all" || /^\/re-?engage-all\b/i.test(input) || /^re-?engage\s+stalled/i.test(input);
 
   if (isDraftCommand) {
     const newLeads = opportunities.filter((opportunity) => opportunity.stage === "New Lead").slice(0, quota);

@@ -251,7 +251,7 @@ export function CreateRecord({ kind }: { kind: Kind }) {
   const task = useWrite(api.createTask, "Task added");
   const member = useWrite(
     api.addTeamMember,
-    "Member added to roster; no invitation email has been sent",
+    "Teammate added to agency roster and welcome email sent",
   );
   const pending =
     company.isPending || person.isPending || deal.isPending || task.isPending || member.isPending;
