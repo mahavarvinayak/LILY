@@ -169,6 +169,22 @@ export async function POST(request: Request) {
           refresh_token: authRes.data.session.refresh_token,
         };
       }
+
+      // Email ownership is proven only once Supabase hands back a session for
+      // this address. Digest mail is gated on this flag (migration 0006), so an
+      // account squatted at signup time never receives cron mail.
+      const verifiedUserId = authRes.data?.user?.id;
+      if (verifiedUserId) {
+        const { error: verifiedError } = await admin
+          .from("profiles")
+          .update({ verified_at: new Date().toISOString() })
+          .eq("id", verifiedUserId)
+          .is("verified_at", null);
+
+        if (verifiedError) {
+          console.error("[verify-otp] could not record email verification:", verifiedError.message);
+        }
+      }
     }
 
     const response = NextResponse.json({

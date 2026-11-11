@@ -114,15 +114,9 @@ export async function POST(request: Request) {
 
     // Only addresses that already own an account may receive a code. Without
     // this check Supabase's admin `generateLink` would auto-create an account
-    // for any address typed into the form. The answer is identical to the
-    // success path so this endpoint cannot discover which addresses exist.
+    // for any address typed into the form.
     const account = await lookupAccount(admin, cleanEmail);
-    if (account !== "exists") {
-      return NextResponse.json({
-        ok: true,
-        message: "If a workspace exists for that address, a 6-digit code is on its way.",
-      });
-    }
+    const accountExists = account === "exists";
 
     await admin
       .from("auth_otps")
@@ -130,23 +124,34 @@ export async function POST(request: Request) {
       .eq("email", cleanEmail)
       .lt("expires_at", new Date().toISOString());
 
-    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-      type: "magiclink",
-      email: cleanEmail,
-    });
+    let tokenHash: string | null = null;
+    let verificationType = "magiclink";
 
-    if (linkError) {
-      // Never echo the provider message: it reveals whether the account exists.
-      return NextResponse.json(
-        { ok: false, error: "We could not issue a sign-in code for this address. Request access from your operator." },
-        { status: 400 },
-      );
+    if (accountExists) {
+      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: cleanEmail,
+      });
+
+      if (linkError) {
+        // Never echo the provider message, and fall through to the decoy path
+        // so a provider failure is indistinguishable from an unknown address.
+        console.error("[send-otp] generateLink failed:", linkError.message);
+      } else if (linkData?.properties?.hashed_token) {
+        tokenHash = linkData.properties.hashed_token;
+        verificationType = linkData.properties.verification_type || "magiclink";
+      }
     }
 
-    const tokenHash = linkData?.properties?.hashed_token;
-    const verificationType = linkData?.properties?.verification_type || "magiclink";
+    const deliverable = tokenHash !== null;
+
     if (!tokenHash) {
-      return NextResponse.json({ ok: false, error: "Failed to generate authentication challenge." }, { status: 500 });
+      // Decoy challenge: same row shape, same cookie, same response, but no
+      // mail and no Supabase account. Without it this route leaks whether an
+      // address has a workspace (different message, missing cookie, and no
+      // attempt counter to burn).
+      tokenHash = crypto.randomBytes(32).toString("hex");
+      verificationType = "magiclink";
     }
 
     const codeNum = crypto.randomInt(100000, 1000000);
@@ -176,10 +181,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Failed to store authentication challenge." }, { status: 500 });
     }
 
-    const resend = new Resend(env.resendApiKey);
-    const fromAddress = env.resendFromEmail || "LILY <hello@thepilab.in>";
+    if (deliverable) {
+      const resend = new Resend(env.resendApiKey);
+      const fromAddress = env.resendFromEmail || "LILY <hello@thepilab.in>";
 
-    const htmlContent = `
+      const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
@@ -213,27 +219,30 @@ export async function POST(request: Request) {
     </html>
     `;
 
-    const { error: resendError } = await resend.emails.send({
-      from: fromAddress,
-      to: [cleanEmail],
-      subject: `Your LILY sign-in code: ${code}`,
-      html: htmlContent,
-      text: `Your LILY sign-in verification code is: ${code}. It expires in 10 minutes.`,
-    });
+      const { error: resendError } = await resend.emails.send({
+        from: fromAddress,
+        to: [cleanEmail],
+        subject: `Your LILY sign-in code: ${code}`,
+        html: htmlContent,
+        text: `Your LILY sign-in verification code is: ${code}. It expires in 10 minutes.`,
+      });
 
-    if (resendError) {
-      // Never leave a challenge behind that the user never received.
-      await admin.from("auth_otps").delete().eq("id", otpRow.id);
-      console.error("[send-otp] Resend rejected the message:", resendError.message);
-      return NextResponse.json(
-        { ok: false, error: "We could not deliver the sign-in code. Please try again." },
-        { status: 502 },
-      );
+      if (resendError) {
+        // Never leave a challenge behind that the user never received.
+        await admin.from("auth_otps").delete().eq("id", otpRow.id);
+        console.error("[send-otp] Resend rejected the message:", resendError.message);
+        return NextResponse.json(
+          { ok: false, error: "We could not deliver the sign-in code. Please try again." },
+          { status: 502 },
+        );
+      }
     }
 
+    // One message for every address, delivered or not: the response must not
+    // depend on whether a workspace exists.
     const response = NextResponse.json({
       ok: true,
-      message: `A 6-digit verification code has been dispatched to ${cleanEmail}.`,
+      message: `If a workspace exists for ${cleanEmail}, a 6-digit code is on its way.`,
     });
 
     response.cookies.set("lily_otp_session", otpRow.id, {

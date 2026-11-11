@@ -2,9 +2,25 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ALLOWED_OPERATOR_EMAILS } from "@/lib/constants";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { MAX_AGENCY_NAME_LENGTH, normalizeAgencyName } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Agency names are client-supplied and end up in email headers and bodies, so
+ * normalise them at the door and reject anything that cannot be a real name.
+ */
+function cleanAgencyName(raw: string | undefined, email: string): string | null {
+  const provided = (raw ?? "").trim();
+  if (!provided) {
+    return normalizeAgencyName(email.split("@")[0] ?? "") || "Agency Workspace";
+  }
+  if (provided.length > MAX_AGENCY_NAME_LENGTH) return null;
+
+  const cleaned = normalizeAgencyName(provided);
+  return cleaned.length >= 2 ? cleaned : null;
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +51,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const agencyName = (agency || cleanEmail.split("@")[0] || "Agency Workspace").trim();
+    const agencyName = cleanAgencyName(agency, cleanEmail);
+    if (!agencyName) {
+      return NextResponse.json(
+        { ok: false, error: "Agency name must be between 2 and 80 characters." },
+        { status: 400 },
+      );
+    }
 
     const admin = createSupabaseAdminClient();
     if (!admin) {

@@ -5,6 +5,7 @@ import { env, isResendConfigured } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { decryptPassword, type EncryptedSecret } from "@/lib/smtp-crypto";
+import { escapeHtml } from "@/lib/html";
 import { validateHostForSsrf } from "@/lib/ssrf";
 
 export const runtime = "nodejs";
@@ -15,14 +16,6 @@ interface SendEmailBody {
   subject?: string;
   body?: string;
   opportunityId?: string;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function renderHtml(body: string) {

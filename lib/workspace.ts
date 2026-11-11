@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeAgencyName } from "@/lib/validation";
 import type {
   Company,
   OpportunityRecord,
@@ -205,9 +206,9 @@ export const api = {
   }) {
     const supabase = getSupabase();
     const user_id = await requireUserId();
-    const agency_name = input.agency_name.trim().slice(0, 120);
+    const agency_name = normalizeAgencyName(input.agency_name);
     const webhook = input.slack_webhook_url.trim();
-    if (!agency_name) throw new Error("Agency name is required.");
+    if (agency_name.length < 2) throw new Error("Agency name must be at least 2 characters.");
     if (webhook && !/^https:\/\/hooks\.slack\.com\/services\//.test(webhook)) {
       throw new Error("Use a Slack incoming webhook URL (https://hooks.slack.com/services/...).");
     }

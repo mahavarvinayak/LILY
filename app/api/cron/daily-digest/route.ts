@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { Resend } from "resend";
+import { getDemoWorkspace } from "@/lib/demo-store";
+import { buildDigestContent } from "@/lib/digest-email";
 import { env, isDemoMode, isResendConfigured, isSupabaseConfigured } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getDemoWorkspace } from "@/lib/demo-store";
-import { formatInr } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,13 +59,17 @@ async function handleDigest(request: Request, digestType: "drop" | "nudge" | "wr
     const pipeline = leads.reduce((sum, o) => sum + o.deal_value, 0);
 
     const emailContent = buildDigestContent(digestType, agencyName, leads.length, pipeline);
-    await resend.emails.send({
+    const { error: demoError } = await resend.emails.send({
       from: env.resendFromEmail,
       to: [clientEmail],
       subject: emailContent.subject,
       html: emailContent.html,
       text: emailContent.text,
     });
+
+    if (demoError) {
+      return NextResponse.json({ ok: false, error: "Demo digest could not be delivered." }, { status: 502 });
+    }
 
     return NextResponse.json({ ok: true, sentTo: [clientEmail], type: digestType });
   }
@@ -82,13 +86,25 @@ async function handleDigest(request: Request, digestType: "drop" | "nudge" | "wr
     return NextResponse.json({ ok: false, error: "Database client unavailable" }, { status: 500 });
   }
 
-  const { data: clients } = await admin
+  const { data: clients, error: clientsError } = await admin
     .from("profiles")
-    .select("id, agency_name, contact_email, daily_lead_quota")
-    .eq("role", "client");
+    .select("id, agency_name, contact_email, daily_lead_quota, verified_at")
+    .eq("role", "client")
+    // Only addresses that proved ownership by completing a sign-in may receive
+    // mail. Signup is open to anyone, so an unverified profile is untrusted
+    // input, not a consenting recipient.
+    .not("verified_at", "is", null);
+
+  if (clientsError) {
+    console.error("[daily-digest] could not load verified clients:", clientsError.message);
+    return NextResponse.json(
+      { ok: false, error: "Workspace schema is not ready for digests. Apply migration 0006." },
+      { status: 503 },
+    );
+  }
 
   if (!clients || clients.length === 0) {
-    return NextResponse.json({ ok: true, message: "No active clients found" });
+    return NextResponse.json({ ok: true, message: "No verified clients found" });
   }
 
   const startOfToday = new Date();
@@ -108,7 +124,19 @@ async function handleDigest(request: Request, digestType: "drop" | "nudge" | "wr
       const at = new Date(o.scheduled_at).getTime();
       return at >= startOfToday.getTime();
     });
+    const pendingApproval = allOpps.filter((o) => !o.outreach_dispatched).length;
     const pipeline = releasedToday.reduce((sum, o) => sum + Number(o.deal_value ?? 0), 0);
+
+    // Never send a digest that has nothing to report: an empty workspace would
+    // otherwise receive three messages a day that only say "zero".
+    const shouldSend =
+      digestType === "wrap"
+        ? allOpps.length > 0
+        : digestType === "nudge"
+          ? pendingApproval > 0
+          : releasedToday.length > 0;
+
+    if (!shouldSend) continue;
 
     const content = buildDigestContent(
       digestType,
@@ -118,71 +146,27 @@ async function handleDigest(request: Request, digestType: "drop" | "nudge" | "wr
     );
 
     try {
-      await resend.emails.send({
+      const { error: sendError } = await resend.emails.send({
         from: env.resendFromEmail,
         to: [client.contact_email],
         subject: content.subject,
         html: content.html,
         text: content.text,
       });
+
+      if (sendError) {
+        // Resend resolves with `{ error }` instead of throwing, so this must be
+        // checked or a rejected message would be counted as delivered.
+        console.error(`[daily-digest] Resend rejected ${digestType} for ${client.id}:`, sendError.message);
+        continue;
+      }
+
       sentList.push(client.contact_email);
-    } catch {}
+    } catch (error) {
+      console.error(`[daily-digest] ${digestType} send threw for ${client.id}:`, error);
+    }
   }
 
   return NextResponse.json({ ok: true, dispatched: sentList.length, type: digestType });
-}
-
-function buildDigestContent(
-  type: "drop" | "nudge" | "wrap",
-  agencyName: string,
-  leadCount: number,
-  pipelineValue: number,
-) {
-  if (type === "drop") {
-    return {
-      subject: `⚡ [LILY] 08:00 AM Lead Drop: ${leadCount} Fresh Leads for ${agencyName}`,
-      html: `<div style="font-family:sans-serif;max-width:560px;color:#18181b;line-height:1.6">
-        <h2 style="color:#6C5CE7;margin-bottom:8px">⚡ Today's 08:00 AM Lead Drop is Live</h2>
-        <p>Hi ${agencyName} Team,</p>
-        <p><strong>${leadCount} verified B2B leads</strong> representing <strong>${formatInr(pipelineValue, true)}</strong> in pipeline value have landed in your LILY workspace.</p>
-        <p>Each lead has a verified decision-maker trigger signal and pre-drafted pain-led pitch ready for your 1-click review.</p>
-        <p style="margin-top:24px">
-          <a href="${env.appUrl}/dashboard/opportunities" style="background:#6C5CE7;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;display:inline-block">Open Pipeline & Review Leads</a>
-        </p>
-      </div>`,
-      text: `Today's 08:00 AM Lead Drop is live for ${agencyName}.\n\n${leadCount} verified leads (${formatInr(pipelineValue, true)}) are ready in your workspace.\nOpen your pipeline: ${env.appUrl}/dashboard/opportunities`,
-    };
-  }
-
-  if (type === "nudge") {
-    return {
-      subject: `🎯 [LILY] 01:00 PM Outreach Nudge: Pitches Waiting for Approval`,
-      html: `<div style="font-family:sans-serif;max-width:560px;color:#18181b;line-height:1.6">
-        <h2 style="color:#6C5CE7;margin-bottom:8px">🎯 01:00 PM Outreach Review Nudge</h2>
-        <p>Hi ${agencyName} Team,</p>
-        <p>Your team's AI-drafted pitches are waiting for human approval in the Outreach Studio.</p>
-        <p>Review the 2-line personalized hooks and click <strong>Approve & Send</strong> to dispatch outbound before the afternoon prospect response window closes.</p>
-        <p style="margin-top:24px">
-          <a href="${env.appUrl}/dashboard/opportunities" style="background:#6C5CE7;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;display:inline-block">Review & Dispatch Pitches</a>
-        </p>
-      </div>`,
-      text: `01:00 PM Outreach Review Nudge for ${agencyName}.\nPitches are waiting in Outreach Studio for review and dispatch.\nReview: ${env.appUrl}/dashboard/opportunities`,
-    };
-  }
-
-  return {
-    subject: `📊 [LILY] 06:00 PM Daily Wrap: Pipeline Status for ${agencyName}`,
-    html: `<div style="font-family:sans-serif;max-width:560px;color:#18181b;line-height:1.6">
-      <h2 style="color:#6C5CE7;margin-bottom:8px">📊 End of Day Pipeline Summary</h2>
-      <p>Hi ${agencyName} Team,</p>
-      <p>Here is your daily outbound summary for today.</p>
-      <p>Total Pipeline Tracked: <strong>${formatInr(pipelineValue, true)}</strong></p>
-      <p>Log in to your workspace to check active prospect replies and follow-up tasks for tomorrow morning.</p>
-      <p style="margin-top:24px">
-        <a href="${env.appUrl}/dashboard" style="background:#6C5CE7;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;display:inline-block">Open LILY Dashboard</a>
-      </p>
-    </div>`,
-    text: `End of Day Pipeline Summary for ${agencyName}.\nTotal Pipeline: ${formatInr(pipelineValue, true)}.\nView: ${env.appUrl}/dashboard`,
-  };
 }
 

@@ -13,6 +13,7 @@ export interface Profile {
   daily_lead_quota: number;
   slack_webhook_url: string | null;
   subscription_tier: SubscriptionTier;
+  verified_at?: string | null;
   created_at: string;
 }
 
