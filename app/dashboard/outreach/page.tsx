@@ -30,7 +30,7 @@ import { CompanyFavicon } from "@/components/app/company-favicon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { extractLeadIntelligence, sanitizeTriggerText, synthesizeDefaultPitch } from "@/lib/intelligence";
+import { extractLeadIntelligence, sanitizeTriggerText } from "@/lib/intelligence";
 import { export31FieldsToCsv } from "@/lib/export-csv";
 import { api, workspaceKey } from "@/lib/workspace";
 import { cn, formatInr } from "@/lib/utils";
@@ -40,13 +40,11 @@ export default function OutreachStudioPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "has-email" | "ready" | "dispatched">("all");
-  const [activeChannel, setActiveChannel] = useState<"email" | "linkedin">("email");
+  const [activeChannel, setActiveChannel] = useState<"email" | "linkedin">("linkedin");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isBatchSending, setIsBatchSending] = useState(false);
-  const [isDraftingAll, setIsDraftingAll] = useState(false);
-  const [isDraftingSingle, setIsDraftingSingle] = useState(false);
 
   const saveDraft = useWrite(api.updateDraft, "Outreach pitch saved");
   const markContacted = useWrite(api.updateStage, "Marked as contacted on LinkedIn");
@@ -120,47 +118,12 @@ export default function OutreachStudioPage() {
     setCustomLinkedinMessage(activeItem.intel.linkedin_message || "");
   }
 
-  function handleRegenerateLinkedIn(company: string, contact: string, trigger: string) {
-    const pitch = synthesizeDefaultPitch(company, contact, trigger);
-    setCustomLinkedinNote(pitch.linkedinNote);
-    setCustomLinkedinMessage(pitch.linkedinMessage);
-    toast.success(`Generated fresh LinkedIn angle for ${company}.`);
-  }
-
   function copyText(key: string, val: string) {
     if (!val) return;
     void navigator.clipboard.writeText(val);
     setCopiedKey(key);
     toast.success("Copied to clipboard.");
     setTimeout(() => setCopiedKey(null), 2000);
-  }
-
-  async function handleDraftSingleWithAi(companyName: string) {
-    if (!companyName) return;
-    setIsDraftingSingle(true);
-    try {
-      const res = await fetch("/api/agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input: `/draft ${companyName}`,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message || "AI drafting failed.");
-      }
-      toast.success(data.message || `Drafted pitch for ${companyName}.`);
-      await qc.invalidateQueries({ queryKey: workspaceKey });
-      if (Array.isArray(data.drafts) && data.drafts.length > 0) {
-        setCustomSubject(data.drafts[0].subject);
-        setCustomBody(data.drafts[0].body);
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "AI drafting failed.");
-    } finally {
-      setIsDraftingSingle(false);
-    }
   }
 
   async function handleSendSingle(oppId: string, to: string, subject: string, body: string) {
@@ -234,29 +197,6 @@ export default function OutreachStudioPage() {
     setIsBatchSending(false);
     await qc.invalidateQueries({ queryKey: workspaceKey });
     toast.success(`Batch dispatch complete. ${successCount} emails sent.`);
-  }
-
-  async function handleDraftAllWithAi() {
-    setIsDraftingAll(true);
-    try {
-      const res = await fetch("/api/agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input: "/draft-all",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message || "AI drafting failed.");
-      }
-      toast.success(data.message || "AI generated bespoke drafts for all leads.");
-      await qc.invalidateQueries({ queryKey: workspaceKey });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "AI drafting failed.");
-    } finally {
-      setIsDraftingAll(false);
-    }
   }
 
   const dispatchedCount = dispatchedLeads.length;
@@ -358,18 +298,6 @@ export default function OutreachStudioPage() {
                 eyebrow="Prospect queue"
                 title="Pipeline decision makers"
                 meta={`${filteredLeads.length} in view`}
-                action={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={isDraftingAll}
-                    onClick={handleDraftAllWithAi}
-                    className="h-8 gap-1 text-[11px] text-primary"
-                  >
-                    <Sparkles className="size-3" />
-                    {isDraftingAll ? "Drafting…" : "Draft all with AI"}
-                  </Button>
-                }
               />
               <div className="flex items-center gap-1.5 overflow-x-auto border-b border-border p-2">
                 <button
@@ -471,11 +399,11 @@ export default function OutreachStudioPage() {
                               </Pill>
                             ) : hasEmail ? (
                               <Pill tone="primary" className="shrink-0">
-                                Ready
+                                Email + LI
                               </Pill>
                             ) : (
-                              <Pill tone="amber" className="shrink-0">
-                                Email needed
+                              <Pill tone="sky" className="shrink-0">
+                                LinkedIn Ready
                               </Pill>
                             )}
                           </div>
@@ -526,8 +454,8 @@ export default function OutreachStudioPage() {
                             Email ready
                           </Pill>
                         ) : (
-                          <Pill tone="amber" dot>
-                            Email needed to send
+                          <Pill tone="sky" dot>
+                            LinkedIn primary
                           </Pill>
                         )}
                         {activeItem.opp.outreach_dispatched && (
@@ -649,16 +577,6 @@ export default function OutreachStudioPage() {
                               Subject line
                             </Label>
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isDraftingSingle}
-                                onClick={() => handleDraftSingleWithAi(activeItem.intel.company_name)}
-                                className="h-6 gap-1 text-[11px] text-primary hover:text-primary"
-                              >
-                                <Sparkles className="size-3" />
-                                {isDraftingSingle ? "Drafting…" : "Regenerate angle with AI"}
-                              </Button>
                               <button
                                 type="button"
                                 onClick={() => copyText("pitch-subject", customSubject)}
@@ -758,21 +676,6 @@ export default function OutreachStudioPage() {
                             Connection Request Note (under 300 characters)
                           </Label>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleRegenerateLinkedIn(
-                                  activeItem.intel.company_name,
-                                  activeItem.intel.contact_name,
-                                  activeItem.intel.buying_trigger,
-                                )
-                              }
-                              className="h-6 gap-1 text-[11px] text-sky-400 hover:text-sky-300"
-                            >
-                              <Sparkles className="size-3" />
-                              Regenerate
-                            </Button>
                             <span
                               className={cn(
                                 "text-[11px] font-mono",

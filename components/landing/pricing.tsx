@@ -4,6 +4,7 @@ import { ArrowUpRight, Check } from "lucide-react";
 const tiers = [
   {
     name: "Starter",
+    id: "starter",
     price: 14000,
     quota: "5 leads / day",
     volume: "~150 verified leads / month",
@@ -11,7 +12,7 @@ const tiers = [
     features: [
       "Trigger-matched leads, 08:00 IST",
       "Twenty-style dark Kanban + dossier",
-      "AI icebreakers on every contact",
+      "Tailored LinkedIn & email pitches",
       "Daily Slack drop digest",
       "3 agency team seats (included)",
       "50% upfront UPI · 50% on Day 15",
@@ -21,6 +22,7 @@ const tiers = [
   },
   {
     name: "Growth",
+    id: "growth",
     price: 29000,
     quota: "15 leads / day",
     volume: "~400 verified leads / month",
@@ -28,9 +30,9 @@ const tiers = [
     features: [
       "Everything in Starter",
       "15 verified leads/day (quota-governed)",
-      "48-hour hiring & funding triggers",
+      "Verified commercial hiring triggers",
       "Resend outreach from your domain",
-      "LILY AI Sales Assistant console",
+      "Full multi-threaded decision makers",
       "5 agency team seats (included)",
       "Operator-led live onboarding",
     ],
@@ -39,6 +41,7 @@ const tiers = [
   },
   {
     name: "Scale",
+    id: "scale",
     price: 45000,
     quota: "30 leads / day",
     volume: "~750+ verified leads / month",
@@ -132,7 +135,7 @@ export function Pricing() {
               </div>
 
               <Link
-                href="/login"
+                href={`/request-access?plan=${tier.id}`}
                 className={`relative mt-7 inline-flex h-10 items-center justify-center gap-2 rounded-[7px] text-[13px] font-semibold transition-colors ${
                   tier.highlight
                     ? "bg-surface text-foreground hover:bg-foreground"
