@@ -3,12 +3,13 @@
 import * as React from "react";
 import { ArrowDownRight, ArrowRight, Clock, IndianRupee } from "lucide-react";
 import { formatInr } from "@/lib/utils";
+import { SUBSCRIPTION_TIERS, SUBSCRIPTION_TIER_NAMES } from "@/lib/constants";
 
-const PLANS = [
-  { max: 5, name: "Starter", price: 14000 },
-  { max: 15, name: "Growth", price: 29000 },
-  { max: 30, name: "Scale", price: 45000 },
-];
+const PLANS = SUBSCRIPTION_TIER_NAMES.map((name) => ({
+  max: SUBSCRIPTION_TIERS[name].quota,
+  name,
+  price: SUBSCRIPTION_TIERS[name].price,
+}));
 
 export function RoiCalculator() {
   const [leads, setLeads] = React.useState(15);

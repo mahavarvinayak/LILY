@@ -52,6 +52,7 @@ async function callOpenAICompatible(
   userPayload: unknown,
   timeoutMs = 25000,
   jsonMode = true,
+  maxTokens = 900,
 ) {
   const maxRetries = model === "glm-4.7-flash" ? 2 : 1;
 
@@ -60,7 +61,7 @@ async function callOpenAICompatible(
       const bodyPayload: Record<string, unknown> = {
         model,
         temperature: 0.35,
-        max_tokens: 900,
+        max_tokens: maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: typeof userPayload === "string" ? userPayload : JSON.stringify(userPayload) },
@@ -102,7 +103,9 @@ async function callOpenAICompatible(
       throw new Error(`LLM call failed with status ${response.status} code ${errCode}`);
     } catch (err: unknown) {
       const error = err as { name?: string; message?: string };
-      if (attempt < maxRetries && error?.name === "AbortError") {
+      // AbortSignal.timeout() rejects with a DOMException named "TimeoutError",
+      // not "AbortError".
+      if (attempt < maxRetries && (error?.name === "AbortError" || error?.name === "TimeoutError")) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         continue;
       }
@@ -122,6 +125,7 @@ async function callWithModelFallback(
   systemPrompt: string,
   userPayload: unknown,
   timeoutMs = 20000,
+  maxTokens = 900,
 ): Promise<string> {
   const keys = Array.from(new Set(apiKeys.filter(Boolean)));
   if (keys.length === 0) return "";
@@ -138,6 +142,8 @@ async function callWithModelFallback(
           systemPrompt,
           userPayload,
           timeoutMs,
+          true,
+          maxTokens,
         );
         if (content) return content;
       } catch {
@@ -149,12 +155,14 @@ async function callWithModelFallback(
   return "";
 }
 
-export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
-  if (leads.length === 0) return [];
-  const fallback = leads.map(fallbackDraft);
+const DRAFT_SYSTEM_PROMPT =
+  "You write high-converting B2B cold outreach for a boutique tech and revenue infrastructure agency. For each lead, return a specific subject line (max 7 words, no clickbait) and a 3-sentence email body (max 60 words). Sentence 1: hook referencing their exact hiring or expansion trigger without scraper tokens. Sentence 2: concrete value proposition (solving the 6-to-8 week hiring lag with instant vetted engineering or growth pods). Sentence 3: one low-friction ask (e.g. 'Worth a 4-minute chat this Thursday?'). No flattery, no 'hope you are well', no emojis, no bullet points, no invented facts. Write like a top-tier peer operator. Return strict JSON: {\"drafts\":[{\"id\":\"...\",\"subject\":\"...\",\"body\":\"...\"}]}";
 
-  const systemPrompt =
-    "You write high-converting B2B cold outreach for a boutique tech and revenue infrastructure agency. For each lead, return a specific subject line (max 7 words, no clickbait) and a 3-sentence email body (max 60 words). Sentence 1: hook referencing their exact hiring or expansion trigger without scraper tokens. Sentence 2: concrete value proposition (solving the 6-to-8 week hiring lag with instant vetted engineering or growth pods). Sentence 3: one low-friction ask (e.g. 'Worth a 4-minute chat this Thursday?'). No flattery, no 'hope you are well', no emojis, no bullet points, no invented facts. Write like a top-tier peer operator. Return strict JSON: {\"drafts\":[{\"id\":\"...\",\"subject\":\"...\",\"body\":\"...\"}]}";
+/** Small batches keep the JSON response inside the token budget. */
+const DRAFT_CHUNK_SIZE = 8;
+
+async function draftChunk(leads: DraftLead[]): Promise<Draft[]> {
+  const fallback = leads.map(fallbackDraft);
 
   const userPayload = {
     leads: leads.map((lead) => ({
@@ -167,6 +175,7 @@ export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
     })),
   };
 
+  const maxTokens = Math.min(4000, Math.max(900, leads.length * 220));
   let content = "";
 
   if (isZaiConfigured()) {
@@ -175,9 +184,10 @@ export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
       endpoint,
       [env.zaiApiKeyFast, env.zaiApiKeyHeavy],
       ["glm-4.5-flash", "glm-4.7-flash"],
-      systemPrompt,
+      DRAFT_SYSTEM_PROMPT,
       userPayload,
       32000,
+      maxTokens,
     );
   }
 
@@ -187,9 +197,11 @@ export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
         "https://api.groq.com/openai/v1/chat/completions",
         env.groqApiKey,
         env.groqModel,
-        systemPrompt,
+        DRAFT_SYSTEM_PROMPT,
         userPayload,
         15000,
+        true,
+        maxTokens,
       );
     } catch {}
   }
@@ -199,17 +211,16 @@ export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
   const parsed = extractJson(content) as { drafts?: unknown } | null;
   if (!parsed || !Array.isArray(parsed.drafts)) return fallback;
 
-  const byId = new Map(
-    (parsed.drafts as { id?: string; subject?: string; body?: string }[])
-      .filter((draft) => typeof draft.id === "string")
-      .map((draft) => [
-        draft.id as string,
-        {
-          subject: String(draft.subject ?? "").slice(0, 140).trim(),
-          body: String(draft.body ?? "").slice(0, 900).trim(),
-        },
-      ]),
-  );
+  const byId = new Map<string, { subject: string; body: string }>();
+  for (const draft of parsed.drafts) {
+    if (!draft || typeof draft !== "object") continue;
+    const record = draft as { id?: unknown; subject?: unknown; body?: unknown };
+    if (typeof record.id !== "string") continue;
+    byId.set(record.id, {
+      subject: String(record.subject ?? "").slice(0, 140).trim(),
+      body: String(record.body ?? "").slice(0, 900).trim(),
+    });
+  }
 
   return leads.map((lead) => {
     const generated = byId.get(lead.id);
@@ -222,8 +233,25 @@ export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
   });
 }
 
+export async function generateDrafts(leads: DraftLead[]): Promise<Draft[]> {
+  if (leads.length === 0) return [];
+
+  const results: Draft[] = [];
+  for (let index = 0; index < leads.length; index += DRAFT_CHUNK_SIZE) {
+    const chunk = leads.slice(index, index + DRAFT_CHUNK_SIZE);
+    results.push(...(await draftChunk(chunk)));
+  }
+  return results;
+}
+
+/**
+ * Multi-word phrases only. Single words like "story", "physics" or
+ * "relationship" appear in legitimate B2B prompts ("the story of our
+ * turnaround", "relationship-building cadence"), so they must not trip the
+ * scope guard.
+ */
 const OFF_TOPIC_REGEX =
-  /\b(poem|poetry|story|recipe|cooking|homework|essay|write a song|solve this math|calculus|algebra|physics|biology|who is the president|movie review|video game|dating advice|relationship|fiction|joke|riddle|translate to french|translate to spanish|crypto price|weather today|horoscope|astrology)\b/i;
+  /\b(write (?:me )?a poem|write (?:me )?a story|write (?:me )?a song|write (?:me )?an essay|solve (?:this|my) (?:math|equation)|who is the president|movie review|video game recommendation|dating advice|translate (?:this|the following) to (?:french|spanish|german|hindi)|crypto price|weather (?:today|forecast)|daily horoscope|birth chart|astrology reading)\b/i;
 
 export function checkB2BScope(prompt: string): { allowed: boolean; refusal?: string } {
   const clean = prompt.trim().toLowerCase();
@@ -289,10 +317,20 @@ export async function agentReply(
 
   if (!content) return null;
 
-  const parsed = extractJson(content) as { message?: string; filter?: string } | null;
-  if (!parsed?.message) return null;
+  const parsed = extractJson(content);
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const record = parsed as { message?: unknown; filter?: unknown };
+  if (typeof record.message !== "string") return null;
+
+  const message = record.message.trim().slice(0, 12000);
+  if (!message) return null;
+
+  const filter =
+    typeof record.filter === "string" ? record.filter.trim().slice(0, 120) : "";
+
   return {
-    message: parsed.message,
-    filter: parsed.filter?.trim() || undefined,
+    message,
+    filter: filter || undefined,
   };
 }

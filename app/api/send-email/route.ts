@@ -3,12 +3,14 @@ import nodemailer from "nodemailer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { decryptPassword, type EncryptedSecret } from "@/lib/smtp-crypto";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, headerText } from "@/lib/html";
 import { validateHostForSsrf } from "@/lib/ssrf";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getConnectedMailboxes, sendComposioOutreach } from "@/lib/composio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 interface SendEmailBody {
   to?: string;
@@ -41,17 +43,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
   }
 
+  const limit = checkRateLimit(`send-email:${user.id}`, 60, 60 * 1000);
+  if (!limit.success) {
+    return NextResponse.json(
+      { ok: false, error: "Sending too fast. Please wait a moment and retry." },
+      { status: 429 },
+    );
+  }
+
   let payload: SendEmailBody;
   try {
-    payload = (await request.json()) as SendEmailBody;
+    const parsed = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
+    }
+    payload = parsed as SendEmailBody;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
+  if (
+    [payload.to, payload.subject, payload.body, payload.opportunityId].some(
+      (value) => value !== undefined && typeof value !== "string",
+    )
+  ) {
+    return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
+  }
+
   const to = payload.to?.trim();
-  const subject = payload.subject?.trim();
+  const rawSubject = payload.subject?.trim();
   const body = payload.body?.trim();
   const opportunityId = payload.opportunityId?.trim();
+  const subject = rawSubject ? headerText(rawSubject, 200) : "";
 
   if (!opportunityId) {
     return NextResponse.json({ ok: false, error: "Opportunity ID is required." }, { status: 400 });
@@ -131,6 +154,13 @@ export async function POST(request: Request) {
   }
 
   if (customMailbox) {
+    if (!customMailbox.smtp_host || !customMailbox.smtp_user) {
+      return NextResponse.json(
+        { ok: false, error: "The saved SMTP mailbox is incomplete. Reconnect it in Connectors." },
+        { status: 400 },
+      );
+    }
+
     const hostSsrf = await validateHostForSsrf(customMailbox.smtp_host);
     if (!hostSsrf.safe) {
       return NextResponse.json(
@@ -141,12 +171,16 @@ export async function POST(request: Request) {
 
     try {
       const plainPass = decryptPassword(customMailbox.encrypted_pass as EncryptedSecret);
+      const smtpSecure = Boolean(customMailbox.smtp_secure);
       // Pin the connection to the vetted address so a rebinding hostname
       // cannot redirect mail delivery to a private target.
       const transporter = nodemailer.createTransport({
         host: hostSsrf.address || customMailbox.smtp_host,
         port: Number(customMailbox.smtp_port) || 465,
-        secure: customMailbox.smtp_secure,
+        secure: smtpSecure,
+        // STARTTLS is mandatory on the non-implicit-TLS ports, otherwise the
+        // AUTH credentials travel in cleartext.
+        requireTLS: !smtpSecure,
         tls: { servername: customMailbox.smtp_host },
         auth: {
           user: customMailbox.smtp_user,
@@ -155,8 +189,14 @@ export async function POST(request: Request) {
         connectionTimeout: 10000,
       });
 
+      // The display name is user text; strip CR/LF and quotes so it cannot
+      // break out of the From header and add recipients or headers.
+      const displayName =
+        headerText(customMailbox.sender_name || "", 80).replace(/["<>]/g, "") || "Growth Lead";
+      const fromAddress = customMailbox.sender_email || customMailbox.smtp_user;
+
       await transporter.sendMail({
-        from: `"${customMailbox.sender_name || "Growth Lead"}" <${customMailbox.smtp_user}>`,
+        from: `"${displayName}" <${fromAddress}>`,
         to,
         subject,
         text: body,
@@ -164,19 +204,27 @@ export async function POST(request: Request) {
       });
 
       if (opportunityId !== "test-verification") {
-        await supabase
+        const { error: dispatchError } = await supabase
           .from("opportunities")
           .update({ outreach_dispatched: true })
           .eq("id", opportunityId)
           .eq("user_id", userId);
 
-        await supabase.from("activity_logs").insert({
+        if (dispatchError) {
+          console.error("[send-email] could not flag outreach_dispatched", dispatchError.message);
+        }
+
+        const { error: logError } = await supabase.from("activity_logs").insert({
           user_id: userId,
           action: "email_dispatched",
-          title: `Outreach Sent: ${to}`,
+          title: `Outreach sent: ${to.slice(0, 120)}`,
           description: `Subject: "${subject}" via custom SMTP.`,
           metadata: { opportunityId, to, subject, provider: "custom_smtp" },
         });
+
+        if (logError) {
+          console.error("[send-email] could not write activity log", logError.message);
+        }
       }
 
       return NextResponse.json({
@@ -185,8 +233,14 @@ export async function POST(request: Request) {
         message: `Outreach dispatched directly from ${customMailbox.smtp_user} via custom SMTP.`,
       });
     } catch (smtpErr) {
+      // Nodemailer errors can expose the SMTP conversation and host details.
+      console.error("[send-email] custom SMTP dispatch failed", smtpErr);
       return NextResponse.json(
-        { ok: false, error: smtpErr instanceof Error ? smtpErr.message : "SMTP dispatch failed." },
+        {
+          ok: false,
+          error:
+            "Your SMTP server rejected the message. Check the mailbox credentials in Connectors and try again.",
+        },
         { status: 502 },
       );
     }
@@ -214,19 +268,27 @@ export async function POST(request: Request) {
     }
 
     if (opportunityId !== "test-verification") {
-      await supabase
+      const { error: dispatchError } = await supabase
         .from("opportunities")
         .update({ outreach_dispatched: true })
         .eq("id", opportunityId)
         .eq("user_id", userId);
 
-      await supabase.from("activity_logs").insert({
+      if (dispatchError) {
+        console.error("[send-email] could not flag outreach_dispatched", dispatchError.message);
+      }
+
+      const { error: logError } = await supabase.from("activity_logs").insert({
         user_id: userId,
         action: "email_dispatched",
-        title: `Outreach Sent: ${to}`,
+        title: `Outreach sent: ${to.slice(0, 120)}`,
         description: `Subject: "${subject}" via connected ${activeComposio.appName}.`,
         metadata: { opportunityId, to, subject, provider: activeComposio.provider },
       });
+
+      if (logError) {
+        console.error("[send-email] could not write activity log", logError.message);
+      }
     }
 
     return NextResponse.json({

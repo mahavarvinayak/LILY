@@ -132,7 +132,13 @@ function LoginFormInner() {
       }
 
       toast.success("Verification successful. Opening workspace…");
-      window.location.href = data.redirectTo || safeNext;
+      const redirectTo =
+        typeof data.redirectTo === "string" &&
+        data.redirectTo.startsWith("/") &&
+        !data.redirectTo.startsWith("//")
+          ? data.redirectTo
+          : safeNext;
+      window.location.href = redirectTo;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invalid code. Please try again.");
     } finally {
@@ -249,6 +255,9 @@ function LoginFormInner() {
                     type="text"
                     required
                     maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     placeholder="482915"

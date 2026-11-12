@@ -88,44 +88,58 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     async function loadUser() {
-      const supabase = createClient();
-      if (!supabase) return;
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const supabase = createClient();
+        if (!supabase) {
+          // No Supabase client means the deployment is not configured; the
+          // loader must not spin forever.
+          toast.error("Workspace database is not configured on this deployment.");
+          return;
+        }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.replace("/login?next=/onboarding");
-        return;
+        if (!user) {
+          router.replace("/login?next=/onboarding");
+          return;
+        }
+
+        setUserEmail(user.email || "");
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("agency_name, target_niche")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("[onboarding] could not load profile", profileError.message);
+        }
+
+        if (profile?.agency_name) {
+          setAgencyName(profile.agency_name);
+        }
+
+        const existingIcp = parseIcpConfig(profile?.target_niche);
+        if (existingIcp) {
+          setServiceOffer(existingIcp.service_offer || "");
+          setTargetGeography(existingIcp.target_geography || "");
+          setTargetIndustry(existingIcp.target_industry || "");
+          setCompanySize(existingIcp.company_size || "");
+          setDecisionMakers(existingIcp.decision_makers || "");
+          setBuyingTrigger(existingIcp.buying_trigger || "");
+          setNegativeFilters(existingIcp.negative_filters || "");
+        }
+      } catch (error) {
+        console.error("[onboarding] load failed", error);
+        toast.error("Could not load your workspace profile.");
+      } finally {
+        setLoading(false);
       }
-
-      setUserEmail(user.email || "");
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("agency_name, target_niche")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profile?.agency_name) {
-        setAgencyName(profile.agency_name);
-      }
-
-      const existingIcp = parseIcpConfig(profile?.target_niche);
-      if (existingIcp) {
-        setServiceOffer(existingIcp.service_offer || "");
-        setTargetGeography(existingIcp.target_geography || "");
-        setTargetIndustry(existingIcp.target_industry || "");
-        setCompanySize(existingIcp.company_size || "");
-        setDecisionMakers(existingIcp.decision_makers || "");
-        setBuyingTrigger(existingIcp.buying_trigger || "");
-        setNegativeFilters(existingIcp.negative_filters || "");
-      }
-
-      setLoading(false);
     }
 
-    loadUser();
+    void loadUser();
   }, [router]);
 
   async function handleSignOut() {
@@ -226,13 +240,14 @@ export default function OnboardingPage() {
                 <Briefcase className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
-                  1. Core Service & Offer
+                <label htmlFor="icp-offer" className="text-sm font-semibold text-foreground">
+                  1. Core Service &amp; Offer
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   What primary service, development capability, or high-ticket offer are you selling?
                 </p>
                 <Input
+                  id="icp-offer"
                   className="mt-3"
                   placeholder="e.g. Custom React & Node Engineering, Staff Augmentation, UI/UX Redesign"
                   value={serviceOffer}
@@ -261,13 +276,14 @@ export default function OnboardingPage() {
                 <Globe className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
+                <label htmlFor="icp-geography" className="text-sm font-semibold text-foreground">
                   2. Target Buyer Geography
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Which countries, regions, or major metropolitan hubs do your prospects operate in?
                 </p>
                 <Input
+                  id="icp-geography"
                   className="mt-3"
                   placeholder="e.g. United States (East/West Coast), United Kingdom, UAE, India, Australia"
                   value={targetGeography}
@@ -296,13 +312,14 @@ export default function OnboardingPage() {
                 <Building2 className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
-                  3. Target Industry & Sector Niches
+                <label htmlFor="icp-industry" className="text-sm font-semibold text-foreground">
+                  3. Target Industry &amp; Sector Niches
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Which sectors or commercial domains represent your ideal client profile?
                 </p>
                 <Input
+                  id="icp-industry"
                   className="mt-3"
                   placeholder="e.g. FinTech, HealthTech, B2B SaaS, E-Commerce, PropTech"
                   value={targetIndustry}
@@ -331,13 +348,14 @@ export default function OnboardingPage() {
                 <Users className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
+                <label htmlFor="icp-size" className="text-sm font-semibold text-foreground">
                   4. Company Headcount Tier
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   What team size has the exact balance of budget and rapid decision speed?
                 </p>
                 <Input
+                  id="icp-size"
                   className="mt-3"
                   placeholder="e.g. 10–50 Employees (Sweet spot for fast closing) or 50–200"
                   value={companySize}
@@ -366,13 +384,14 @@ export default function OnboardingPage() {
                 <Target className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
+                <label htmlFor="icp-titles" className="text-sm font-semibold text-foreground">
                   5. Target Decision-Maker Designations
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Which specific job titles have the authority to evaluate and approve your proposal?
                 </p>
                 <Input
+                  id="icp-titles"
                   className="mt-3"
                   placeholder="e.g. Founder, CEO, CTO, VP of Engineering, Head of Growth"
                   value={decisionMakers}
@@ -401,13 +420,14 @@ export default function OnboardingPage() {
                 <Zap className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
+                <label htmlFor="icp-trigger" className="text-sm font-semibold text-foreground">
                   6. The Active Buying Trigger
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   What observable problem, live hiring spike, or recent event makes your outreach urgent?
                 </p>
                 <Textarea
+                  id="icp-trigger"
                   className="mt-3 min-h-[72px]"
                   placeholder="e.g. Companies actively hiring 2+ React developers OR companies that raised Seed/Series A in last 60 days"
                   value={buyingTrigger}
@@ -436,13 +456,14 @@ export default function OnboardingPage() {
                 <Ban className="size-4" />
               </div>
               <div className="flex-1">
-                <label className="text-sm font-semibold text-foreground">
-                  7. Negative Filters & Exclusions
+                <label htmlFor="icp-exclusions" className="text-sm font-semibold text-foreground">
+                  7. Negative Filters &amp; Exclusions
                 </label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Which types of companies, domains, or competitors must be 100% excluded?
                 </p>
                 <Input
+                  id="icp-exclusions"
                   className="mt-3"
                   placeholder="e.g. No IT consulting agencies/competitors, no crypto/gambling, no enterprises > 500 staff"
                   value={negativeFilters}

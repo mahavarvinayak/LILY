@@ -31,7 +31,7 @@ const faqs = [
   },
   {
     q: "What if the first week is not a fit?",
-    a: "Tell the operator. Founding cohort plans are month-to-month, and the first cycle is covered by a fit check: if the signal quality is wrong for your niche, we retune the lane or refund the cycle. No annual contract to escape.",
+    a: "Tell the operator. Plans are month-to-month, and the first cycle includes a fit check: if the signal quality is wrong for your niche, we retune the lane. Payments become non-refundable once the dedicated workers have started sourcing for your niche — see the Terms for the exact boundary.",
   },
 ];
 
@@ -50,7 +50,7 @@ export function Faq() {
               href="mailto:hello@thepilab.in"
               className="font-medium text-muted-foreground underline decoration-foreground/20 underline-offset-4 transition-colors hover:text-foreground"
             >
-              vinayak@lily.os
+              hello@thepilab.in
             </a>{" "}
             — the operator answers.
           </p>

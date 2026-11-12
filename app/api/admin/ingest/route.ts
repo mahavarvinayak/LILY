@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateDrafts } from "@/lib/ai";
-import { isDemoMode, isSupabaseConfigured } from "@/lib/env";
+import { isDemoMode, isServiceRoleConfigured, isSupabaseConfigured } from "@/lib/env";
 import { addDemoLead, updateDemoProfileQuota } from "@/lib/demo-store";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -31,17 +31,35 @@ export async function GET() {
     );
   }
 
+  // The allow-list alone is not enough: the role is the authorisation the RLS
+  // helper and the rest of the app rely on.
+  const { data: profileRow } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if ((profileRow as { role?: string } | null)?.role !== "super_admin") {
+    return NextResponse.json(
+      { authorized: false, error: "Super admin role required." },
+      { status: 403 },
+    );
+  }
+
   const admin = createSupabaseAdminClient();
   if (!admin) {
     return NextResponse.json(
       { authorized: false, error: "Admin client unconfigured." },
-      { status: 500 },
+      { status: 503 },
     );
   }
 
   const { data: clients, error } = await admin
     .from("profiles")
-    .select("id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier, created_at")
+    .select(
+      "id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier, payment_utr, payment_verified, payment_amount, created_at",
+    )
+    .eq("role", "client")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -125,7 +143,7 @@ export async function POST(request: Request) {
   if (!demo) {
     const supabase = await createSupabaseServerClient();
     if (!supabase) {
-      return NextResponse.json({ ok: false, error: "Supabase is not configured." }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Supabase is not configured." }, { status: 503 });
     }
     const {
       data: { user },
@@ -149,10 +167,10 @@ export async function POST(request: Request) {
     }
 
     adminClient = createSupabaseAdminClient();
-    if (!adminClient) {
+    if (!adminClient || !isServiceRoleConfigured()) {
       return NextResponse.json(
         { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY is missing on the server." },
-        { status: 500 },
+        { status: 503 },
       );
     }
   }
@@ -177,6 +195,12 @@ export async function POST(request: Request) {
   }
 
   for (const [index, lead] of leads.entries()) {
+    if (!lead || typeof lead !== "object" || Array.isArray(lead)) {
+      return NextResponse.json(
+        { ok: false, error: `Lead ${index + 1} is not a valid object.` },
+        { status: 400 },
+      );
+    }
     if (
       !isNonEmpty(lead.company_name) ||
       !isNonEmpty(lead.contact_name) ||
@@ -297,11 +321,14 @@ export async function POST(request: Request) {
       let companyId: string | null = null;
       if (normalized.domain) {
         const lowerDomain = normalized.domain.toLowerCase();
+        // `%` and `_` are ILIKE wildcards; an attacker-supplied domain could
+        // otherwise match (and then mutate) an unrelated company.
+        const safeDomain = lowerDomain.replace(/[\\%_]/g, (char) => `\\${char}`);
         const { data: existingCompany } = await admin
           .from("companies")
           .select("id")
           .eq("user_id", clientId)
-          .ilike("domain", lowerDomain)
+          .ilike("domain", safeDomain)
           .maybeSingle();
         companyId = existingCompany?.id ?? null;
       }
@@ -465,7 +492,7 @@ export async function POST(request: Request) {
         recent_founder_activity: String(rawLead.recent_activity || rawLead.recent_founder_activity || ""),
         ai_icebreaker: normalized.body || "",
         email_subject_line: normalized.subject || "",
-        verification_status: String(rawLead.verification_status || "Verified 100%"),
+        verification_status: String(rawLead.verification_status || ""),
         source_attribution: normalized.triggerUrl || normalized.website || "",
       });
 

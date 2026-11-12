@@ -18,6 +18,15 @@ export function isSupabaseConfigured() {
   return Boolean(env.supabaseUrl && env.supabaseAnonKey);
 }
 
+/**
+ * The service-role client bypasses RLS, so operator/admin routes must refuse to
+ * run without it rather than silently falling back to the anon client (which
+ * would either leak nothing or, worse, let the route pretend it succeeded).
+ */
+export function isServiceRoleConfigured() {
+  return Boolean(env.supabaseUrl && env.supabaseServiceRoleKey);
+}
+
 export function isGroqConfigured() {
   return Boolean(env.groqApiKey);
 }

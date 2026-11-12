@@ -125,22 +125,26 @@ export function ConnectorsPage() {
     }
   }
 
-  async function disconnect(accountId: string) {
-    setDisconnectingId(accountId);
+  async function disconnect(mailbox: ConnectedMailbox) {
+    setDisconnectingId(mailbox.id);
     try {
-      const endpoint =
-        accountId === "custom-smtp-mailbox"
-          ? "/api/mailboxes/smtp/disconnect"
-          : "/api/composio/disconnect";
+      // Branch on the stored provider, not on a sentinel id: the status route
+      // returns the workspace_mailboxes UUID for a custom SMTP mailbox, so the
+      // old `id === "custom-smtp-mailbox"` check never matched and the request
+      // went to Composio with a Postgres UUID.
+      const isCustomSmtp = mailbox.provider === "custom_smtp";
+      const endpoint = isCustomSmtp
+        ? "/api/mailboxes/smtp/disconnect"
+        : "/api/composio/disconnect";
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: accountId }),
+        body: JSON.stringify({ id: mailbox.id, accountId: mailbox.id }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to disconnect.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Failed to disconnect.");
       }
       toast.success("Mailbox disconnected.");
       await qc.invalidateQueries({ queryKey: ["connectors"] });
@@ -297,7 +301,7 @@ export function ConnectorsPage() {
                       variant="ghost"
                       size="sm"
                       disabled={disconnectingId === activeMailbox.id}
-                      onClick={() => void disconnect(activeMailbox.id)}
+                      onClick={() => void disconnect(activeMailbox)}
                       className="h-8 gap-1 text-xs text-muted-foreground hover:text-destructive"
                     >
                       {disconnectingId === activeMailbox.id ? (

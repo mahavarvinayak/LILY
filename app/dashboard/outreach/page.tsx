@@ -49,7 +49,7 @@ export default function OutreachStudioPage() {
   const saveDraft = useWrite(api.updateDraft, "Outreach pitch saved");
   const markContacted = useWrite(api.updateStage, "Marked as contacted on LinkedIn");
 
-  const { data: mailboxData } = useQuery<{
+  const { data: mailboxData, isError: mailboxQueryFailed } = useQuery<{
     ok: boolean;
     mailboxes?: Array<{
       id: string;
@@ -62,6 +62,9 @@ export default function OutreachStudioPage() {
     queryKey: ["connected-mailboxes"],
     queryFn: async () => {
       const res = await fetch("/api/composio/status");
+      if (!res.ok) {
+        throw new Error("Could not load connected mailboxes.");
+      }
       return res.json();
     },
   });
@@ -120,10 +123,19 @@ export default function OutreachStudioPage() {
 
   function copyText(key: string, val: string) {
     if (!val) return;
-    void navigator.clipboard.writeText(val);
-    setCopiedKey(key);
-    toast.success("Copied to clipboard.");
-    setTimeout(() => setCopiedKey(null), 2000);
+    // Clipboard writes reject on insecure contexts and when the document is
+    // not focused; an unhandled rejection used to surface as a console error
+    // while the toast still claimed success.
+    navigator.clipboard
+      .writeText(val)
+      .then(() => {
+        setCopiedKey(key);
+        toast.success("Copied to clipboard.");
+        setTimeout(() => setCopiedKey(null), 2000);
+      })
+      .catch(() => {
+        toast.error("Could not copy. Select the text and copy manually.");
+      });
   }
 
   async function handleSendSingle(oppId: string, to: string, subject: string, body: string) {
@@ -160,17 +172,22 @@ export default function OutreachStudioPage() {
   }
 
   async function handleBatchSend() {
-    const queue = readyLeads;
+    // Only leads with a real address can be dispatched; sending the whole
+    // ready queue meant the route rejected rows with an empty `to` while the
+    // UI still reported "batch complete".
+    const queue = readyLeads.filter((item) => item.hasEmail);
     if (!queue.length) {
-      toast.info("No leads with verified email awaiting dispatch.");
+      toast.info("No leads with a verified email are awaiting dispatch.");
       return;
     }
 
     setIsBatchSending(true);
     let successCount = 0;
+    let failureCount = 0;
+    let lastError = "";
 
     for (const item of queue) {
-      const to = item.intel.work_email;
+      const to = item.intel.work_email.trim();
       const subject = item.opp.ai_subject_line || item.intel.email_subject_line;
       const body = item.opp.ai_icebreaker || item.intel.ai_icebreaker;
 
@@ -185,22 +202,40 @@ export default function OutreachStudioPage() {
             body,
           }),
         });
-        const data = await res.json();
-        if (data.ok) {
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.ok) {
           successCount += 1;
+        } else {
+          failureCount += 1;
+          lastError = data?.error || `Request failed (${res.status}).`;
         }
-      } catch {}
+      } catch (err) {
+        failureCount += 1;
+        lastError = err instanceof Error ? err.message : "Network error.";
+      }
 
+      // Space out sends so a provider does not throttle the whole batch.
       await new Promise((r) => setTimeout(r, 2000));
     }
 
     setIsBatchSending(false);
     await qc.invalidateQueries({ queryKey: workspaceKey });
-    toast.success(`Batch dispatch complete. ${successCount} emails sent.`);
+
+    if (successCount > 0) {
+      toast.success(
+        `Batch dispatch complete. ${successCount} email${successCount === 1 ? "" : "s"} sent.`,
+      );
+    }
+    if (failureCount > 0) {
+      toast.error(
+        `${failureCount} email${failureCount === 1 ? "" : "s"} failed.${lastError ? ` ${lastError}` : ""}`,
+      );
+    }
   }
 
   const dispatchedCount = dispatchedLeads.length;
   const readyCount = readyLeads.length;
+  const sendableCount = readyLeads.filter((item) => item.hasEmail).length;
   const totalPipelineCount = allQueueLeads.length;
   const queueValue = allQueueLeads.reduce((sum, item) => sum + item.opp.deal_value, 0);
 
@@ -235,12 +270,12 @@ export default function OutreachStudioPage() {
             </Button>
             <Button
               size="sm"
-              disabled={isBatchSending || readyCount === 0 || !activeMailbox}
+              disabled={isBatchSending || sendableCount === 0 || !activeMailbox}
               onClick={handleBatchSend}
               className="gap-1.5 text-xs"
             >
               <Send className="size-3.5" />
-              {isBatchSending ? "Dispatching..." : `Send All Approved (${readyCount})`}
+              {isBatchSending ? "Dispatching..." : `Send All Approved (${sendableCount})`}
             </Button>
           </div>
         }
@@ -640,7 +675,11 @@ export default function OutreachStudioPage() {
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-300">
                           <div className="flex items-center gap-2">
                             <Mail className="size-4 shrink-0 text-amber-400" />
-                            <span>No client mailbox connected. Connect your Google Workspace, Outlook, or SMTP to send.</span>
+                            <span>
+                              {mailboxQueryFailed
+                                ? "Could not load your mailbox status. Refresh before sending."
+                                : "No client mailbox connected. Connect your Google Workspace, Outlook, or SMTP to send."}
+                            </span>
                           </div>
                           <Link
                             href="/dashboard/connectors"

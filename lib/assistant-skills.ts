@@ -31,6 +31,70 @@ function resolveTarget(ctx: SkillContext): OpportunityRecord | null {
   return ctx.allOpps.filter((o) => o.stage !== "Lost").sort((a, b) => b.deal_value - a.deal_value)[0] || null;
 }
 
+/**
+ * Qualification used to print fixed, impressive-looking scores for every lead.
+ * These now come from the fields actually stored on the opportunity.
+ */
+const AUTHORITY_TITLES =
+  /(founder|co-?founder|ceo|cto|coo|cpo|ciso|chief|president|vp|vice president|head of|director)/i;
+
+const STAGE_FIT: Record<string, number> = {
+  Proposal: 9,
+  Meeting: 8,
+  Screening: 6,
+  "New Lead": 5,
+  Customer: 7,
+  Lost: 1,
+};
+
+function qualificationScores(opp: OpportunityRecord | null) {
+  if (!opp) {
+    const none = "No opportunity matched";
+    return {
+      trigger: 0,
+      commercial: 0,
+      authority: 0,
+      fit: 0,
+      triggerAge: none,
+      commercialNote: none,
+      authorityNote: none,
+      verdict: "No opportunity matched. Pick a released opportunity, then re-run /icp-sharpen.",
+    };
+  }
+
+  const created = new Date(opp.created_at).getTime();
+  const ageDays = Number.isFinite(created)
+    ? Math.max(0, Math.floor((Date.now() - created) / 86_400_000))
+    : null;
+  const trigger = ageDays === null ? 5 : ageDays <= 3 ? 9 : ageDays <= 7 ? 7 : ageDays <= 14 ? 5 : 3;
+
+  const value = Number.isFinite(Number(opp.deal_value)) ? Number(opp.deal_value) : 0;
+  const commercial =
+    value >= 1_000_000 ? 9 : value >= 500_000 ? 7 : value >= 100_000 ? 5 : value > 0 ? 3 : 1;
+
+  const title = (opp.person?.job_title ?? "").trim();
+  const authority = !title ? 4 : AUTHORITY_TITLES.test(title) ? 9 : 6;
+
+  const fit = STAGE_FIT[opp.stage] ?? 4;
+  const average = (trigger + commercial + authority + fit) / 4;
+
+  return {
+    trigger,
+    commercial,
+    authority,
+    fit,
+    triggerAge: ageDays === null ? "age unknown" : `${ageDays} day(s) old`,
+    commercialNote: value > 0 ? `Deal value ${value.toLocaleString("en-IN")}` : "Deal value not set",
+    authorityNote: title || "Job title not recorded",
+    verdict:
+      average >= 8
+        ? "Tier-1 target. Dispatch tailored outreach while the trigger is warm."
+        : average >= 6
+          ? "Tier-2 target. Confirm budget and decision authority on the first call."
+          : "Tier-3 target. Nurture until the buying trigger sharpens.",
+  };
+}
+
 function getDetails(opp: OpportunityRecord | null, agencyName: string) {
   const company = opp?.company?.name || "Target Account";
   const contact = opp?.person?.first_name || "Leader";
@@ -86,10 +150,12 @@ ${agency}`;
 **Recipient:** ${contact} · **Anchor:** ${trigger}
 
 #### Touch 1: Value Drop (Day 3)
-> “${contact}, quick resource for your team: when scaling ${trigger.toLowerCase()}, teams often hit delivery bottlenecks. Here is a 3-point sprint audit we ran for a similar team that cut dev overhead by 34%. Thought it might be useful as you grow.”
+> “${contact}, quick resource for your team: when scaling ${trigger.toLowerCase()}, teams often hit delivery bottlenecks. Here is the 3-point sprint audit we run for teams in that position — happy to send it over if it is useful.”
 
 #### Touch 2: Social Proof & Metrics (Day 7)
-> “Hi ${contact}, we recently partnered with a fast-scaling tech firm facing the same requisition challenge. Placed two senior engineers within 96 hours, taking their backlog to zero. Worth 10 minutes to review how we structured their sprint?”
+> “Hi ${contact}, we recently partnered with a fast-scaling tech firm facing the same requisition challenge. We placed a senior pod inside [N] business days and cleared their release backlog. Worth 10 minutes to review how we structured that sprint?”
+
+*(Replace \`[N] business days\` and any outcomes with numbers you can evidence from your own delivery history.)*
 
 #### Touch 3: Low-Friction Permission (Day 12)
 > “${contact}, know you're knee-deep in quarterly priorities. If now isn't the right time to augment your delivery squad, happy to pause. Just reply 'pause' and I’ll circle back next quarter.”
@@ -206,7 +272,7 @@ Send Tier 1 touch on Tuesday morning. If no response by Thursday, message Tier 2
     command: "/subject-lines",
     name: "10 High-Conversion Subject Lines",
     badge: "Email",
-    description: "Curiosity, pain, and trigger-led email subjects with 60%+ open potential",
+    description: "Curiosity, pain, and trigger-led email subjects worth testing",
     example: "/subject-lines ValueDX",
     run: (ctx) => {
       const opp = resolveTarget(ctx);
@@ -214,16 +280,16 @@ Send Tier 1 touch on Tuesday morning. If no response by Thursday, message Tier 2
       return `### 10 High-Open Subject Lines for ${company}
 **Recipient:** ${contact}
 
-1. \`${company} + ${trigger.slice(0, 25)}...\` *(Trigger-led · 64% Avg Open)*
-2. \`Quick question regarding ${company} engineering\` *(Direct Curiosity · 58% Avg Open)*
-3. \`${contact}, 12 mins this Thursday?\` *(Personal Low-Friction · 55% Avg Open)*
-4. \`Idea for ${company}'s delivery sprint\` *(Value-first · 61% Avg Open)*
-5. \`Resource for ${contact} re: ${company}\` *(Helpful · 52% Avg Open)*
-6. \`Solving the 8-week hiring lag at ${company}\` *(Pain-driven · 67% Avg Open)*
-7. \`Sprint capacity for ${company}\` *(Clean B2B · 59% Avg Open)*
-8. \`${company} Q4 roadmap acceleration\` *(Executive focus · 63% Avg Open)*
-9. \`Quick feedback on ${trigger.slice(0, 20)}\` *(Peer hook · 57% Avg Open)*
-10. \`Permission to close your file, ${contact}?\` *(Breakup subject · 72% Avg Open)*`;
+1. \`${company} + ${trigger.slice(0, 25)}...\` *(Trigger-led)*
+2. \`Quick question regarding ${company} engineering\` *(Direct curiosity)*
+3. \`${contact}, 12 mins this Thursday?\` *(Personal low-friction)*
+4. \`Idea for ${company}'s delivery sprint\` *(Value-first)*
+5. \`Resource for ${contact} re: ${company}\` *(Helpful)*
+6. \`Solving the hiring lag at ${company}\` *(Pain-driven)*
+7. \`Sprint capacity for ${company}\` *(Clean B2B)*
+8. \`${company} roadmap acceleration\` *(Executive focus)*
+9. \`Quick feedback on ${trigger.slice(0, 20)}\` *(Peer hook)*
+10. \`Permission to close your file, ${contact}?\` *(Breakup)*`;
     },
   },
   {
@@ -291,9 +357,9 @@ ${ctx.agencyName}`;
     run: () => {
       return `### 60-Word Proof Snippet
 
-> “When a fast-growing digital agency hit a 6-week bottleneck on their custom enterprise delivery, we injected a 2-engineer senior squad within 72 hours. Result: 100% of sprint deliverables shipped 4 days ahead of deadline, saving ₹3.8L in recruitment agency retainers.”
+> “[Client situation in one line], we [squad you deployed] within [timeframe]. Result: [verified outcome — shipped scope, days earlier, cost saved].”
 
-*Copy and drop this directly into paragraph 2 of any cold outreach or follow-up email.*`;
+*Fill in only outcomes you can evidence from your own delivery history — LILY will not invent client results. Then drop the snippet into paragraph 2 of a cold outreach or follow-up email.*`;
     },
   },
   {
@@ -361,16 +427,20 @@ ${ctx.agencyName}`;
     run: (ctx) => {
       const opp = resolveTarget(ctx);
       const { company, trigger } = getDetails(opp, ctx.agencyName);
+      const scores = qualificationScores(opp);
+
       return `### Lead Qualification Analysis for ${company}
 
 | Qualification Metric | Observation | Score (1-10) |
 | :--- | :--- | :--- |
-| **Trigger Urgency** | ${trigger} (< 7 days old) | 9/10 |
-| **Commercial Intent** | Active requisition requiring direct capital allocation | 8/10 |
-| **Authority Ceiling** | Direct Founder/CEO contact verified | 9/10 |
-| **Deal Fit** | Prime COGS replacement candidate | 8.5/10 |
+| **Trigger Urgency** | ${trigger} (${scores.triggerAge}) | ${scores.trigger}/10 |
+| **Commercial Intent** | ${scores.commercialNote} | ${scores.commercial}/10 |
+| **Authority Ceiling** | ${scores.authorityNote} | ${scores.authority}/10 |
+| **Deal Fit** | Stage: ${opp?.stage ?? "unknown"} | ${scores.fit}/10 |
 
-**Verdict:** **Tier-1 Priority Target.** Dispatch tailored outreach within 24 hours while hiring trigger is active.`;
+**Verdict:** **${scores.verdict}**
+
+*Scores are a heuristic over the fields recorded on this opportunity — check them against what you learn on the call.*`;
     },
   },
 ];

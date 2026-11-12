@@ -8,9 +8,25 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** One digest can fan out to every verified client; keep the function alive. */
+export const maxDuration = 60;
 
 const DIGEST_TYPES = ["drop", "nudge", "wrap"] as const;
 type DigestType = (typeof DIGEST_TYPES)[number];
+
+/** IST is UTC+05:30 with no DST, so a fixed offset is exact. */
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/** The instant IST midnight began for the day containing `now`. */
+function istDayStart(now = new Date()): Date {
+  const shifted = new Date(now.getTime() + IST_OFFSET_MS);
+  shifted.setUTCHours(0, 0, 0, 0);
+  return new Date(shifted.getTime() - IST_OFFSET_MS);
+}
+
+function digestLogAction(digestType: DigestType): string {
+  return `digest_${digestType}_sent`;
+}
 
 function digestTypeOf(value: string | null | undefined): DigestType {
   return DIGEST_TYPES.includes(value as DigestType) ? (value as DigestType) : "drop";
@@ -53,11 +69,19 @@ export async function POST(request: Request) {
 
 async function handleDigest(request: Request, digestType: DigestType) {
   if (!isResendConfigured()) {
-    return NextResponse.json({
-      ok: true,
-      simulated: true,
-      message: `Resend is not configured. Simulated ${digestType} update.`,
-    });
+    // Failing open here would tell the scheduler "sent" while nothing was
+    // delivered. Only an explicit demo build may simulate delivery.
+    if (isDemoMode()) {
+      return NextResponse.json({
+        ok: true,
+        simulated: true,
+        message: `Resend is not configured. Simulated ${digestType} update.`,
+      });
+    }
+    return NextResponse.json(
+      { ok: false, error: "RESEND_API_KEY is not configured; digests cannot be delivered." },
+      { status: 503 },
+    );
   }
 
   const resend = new Resend(env.resendApiKey);
@@ -121,8 +145,10 @@ async function handleDigest(request: Request, digestType: DigestType) {
     return NextResponse.json({ ok: true, message: "No verified clients found" });
   }
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Digests are scheduled in IST, so "today" must be the IST day, not the
+  // server's local (UTC) day — otherwise the 08:00 IST drop lands in yesterday.
+  const dayStart = istDayStart();
+  const startOfTodayIso = dayStart.toISOString();
 
   type DigestOpp = {
     user_id: string;
@@ -150,7 +176,7 @@ async function handleDigest(request: Request, digestType: DigestType) {
       .lte("scheduled_at", nowIso);
 
     if (digestType === "drop") {
-      page = page.gte("scheduled_at", startOfToday.toISOString());
+      page = page.gte("scheduled_at", startOfTodayIso);
     } else if (digestType === "nudge") {
       page = page.or("outreach_dispatched.is.null,outreach_dispatched.eq.false");
     }
@@ -177,13 +203,33 @@ async function handleDigest(request: Request, digestType: DigestType) {
     else byClient.set(opp.user_id, [opp]);
   }
 
+  // The crons can (and do) retry. Without this check a retried run re-sends the
+  // same digest, which is how clients were getting duplicate morning drops.
+  const { data: alreadySent, error: sentError } = await admin
+    .from("activity_logs")
+    .select("user_id")
+    .in("user_id", clientIds)
+    .eq("action", digestLogAction(digestType))
+    .gte("created_at", startOfTodayIso);
+
+  if (sentError) {
+    console.error("[daily-digest] could not load send history:", sentError.message);
+    return NextResponse.json({ ok: false, error: "Could not check digest history." }, { status: 500 });
+  }
+
+  const alreadySentIds = new Set(
+    ((alreadySent ?? []) as { user_id: string }[]).map((row) => row.user_id),
+  );
+
   const sentList: string[] = [];
 
   for (const client of clients) {
+    if (alreadySentIds.has(client.id)) continue;
+
     const allOpps = byClient.get(client.id) ?? [];
     const releasedToday = allOpps.filter((o) => {
       const at = new Date(o.scheduled_at).getTime();
-      return at >= startOfToday.getTime();
+      return at >= dayStart.getTime();
     });
     const pendingApproval = allOpps.filter((o) => !o.outreach_dispatched).length;
     const pipeline = releasedToday.reduce((sum, o) => sum + Number(o.deal_value ?? 0), 0);
@@ -223,6 +269,19 @@ async function handleDigest(request: Request, digestType: DigestType) {
       }
 
       sentList.push(client.contact_email);
+
+      // Record the send so a retried cron run skips this client.
+      const { error: logError } = await admin.from("activity_logs").insert({
+        user_id: client.id,
+        action: digestLogAction(digestType),
+        title: `Daily ${digestType} digest delivered`,
+        description: `${releasedToday.length} lead(s), ₹${pipeline} pipeline.`,
+        metadata: { digestType, day: startOfTodayIso, leads: releasedToday.length, pipeline },
+      });
+
+      if (logError) {
+        console.error(`[daily-digest] could not record ${digestType} for ${client.id}:`, logError.message);
+      }
     } catch (error) {
       console.error(`[daily-digest] ${digestType} send threw for ${client.id}:`, error);
     }

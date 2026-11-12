@@ -85,15 +85,30 @@ export function synthesizeDefaultPitch(company: string, contactName: string, raw
   return { emailSubject, emailBody, linkedinNote, linkedinMessage };
 }
 
-export function parseJsonNotes(notes: string | null | undefined): Partial<LeadIntelligence31> {
+export function parseJsonNotes(notes: string | null | undefined): Record<string, unknown> {
   if (!notes) return {};
   try {
     const trimmed = notes.trim();
     if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-      return JSON.parse(trimmed) as Partial<LeadIntelligence31>;
+      const parsed: unknown = JSON.parse(trimmed);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
     }
   } catch {}
   return {};
+}
+
+/** Notes are writable JSON, so every field must be type-checked on read. */
+function metaText(meta: Record<string, unknown>, key: string): string {
+  const value = meta[key];
+  return typeof value === "string" ? value : "";
+}
+
+function metaList(meta: Record<string, unknown>, key: string): string[] {
+  const value = meta[key];
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
 }
 
 export function extractLeadIntelligence(
@@ -103,7 +118,7 @@ export function extractLeadIntelligence(
 ): LeadIntelligence31 {
   const company = opp.company || fallbackCompany;
   const person = opp.person || fallbackPerson;
-  const jsonMeta = parseJsonNotes(opp.notes);
+  const meta = parseJsonNotes(opp.notes);
 
   const rawPersonName = person
     ? `${person.first_name} ${person.last_name || ""}`.trim()
@@ -111,44 +126,44 @@ export function extractLeadIntelligence(
 
   const companyName =
     company?.name ||
-    jsonMeta.company_name ||
+    metaText(meta, "company_name") ||
     opp.deal_name?.split("—")[0]?.trim() ||
     "Organization";
 
   const website =
     company?.website ||
     (company?.domain ? (company.domain.startsWith("http") ? company.domain : `https://${company.domain}`) : "") ||
-    jsonMeta.website ||
+    metaText(meta, "website") ||
     "";
 
   const companyLinkedinUrl =
     company?.linkedin_url ||
-    jsonMeta.company_linkedin_url ||
+    metaText(meta, "company_linkedin_url") ||
     "";
 
   const contactName =
     rawPersonName ||
-    jsonMeta.contact_name ||
+    metaText(meta, "contact_name") ||
     "Decision Maker";
 
   const contactTitle =
     person?.job_title ||
-    jsonMeta.job_title ||
+    metaText(meta, "job_title") ||
     "Leadership";
 
   const workEmail =
     person?.email ||
-    jsonMeta.work_email ||
+    metaText(meta, "work_email") ||
     "";
 
   const linkedinUrl =
     person?.linkedin_url ||
-    jsonMeta.linkedin_url ||
+    metaText(meta, "linkedin_url") ||
     "";
 
   const rawBuyingTrigger =
     opp.buying_trigger ||
-    jsonMeta.buying_trigger ||
+    metaText(meta, "buying_trigger") ||
     "";
   const buyingTrigger = sanitizeTriggerText(rawBuyingTrigger);
 
@@ -156,7 +171,7 @@ export function extractLeadIntelligence(
 
   const triggerUrl =
     opp.trigger_url ||
-    jsonMeta.trigger_url ||
+    metaText(meta, "trigger_url") ||
     "";
 
   const isOldShortDm = Boolean(
@@ -167,21 +182,21 @@ export function extractLeadIntelligence(
 
   const aiIcebreaker =
     (!isOldShortDm && opp.ai_icebreaker) ||
-    jsonMeta.ai_icebreaker ||
+    metaText(meta, "ai_icebreaker") ||
     defaultPitch.emailBody;
 
   const emailSubjectLine =
     opp.ai_subject_line ||
-    jsonMeta.email_subject_line ||
+    metaText(meta, "email_subject_line") ||
     defaultPitch.emailSubject;
 
   const linkedinNote =
     (isOldShortDm ? opp.ai_icebreaker : null) ||
-    jsonMeta.linkedin_note ||
+    metaText(meta, "linkedin_note") ||
     defaultPitch.linkedinNote;
 
   const linkedinMessage =
-    jsonMeta.linkedin_message ||
+    metaText(meta, "linkedin_message") ||
     defaultPitch.linkedinMessage;
 
   return {
@@ -190,81 +205,76 @@ export function extractLeadIntelligence(
     company_linkedin_url: companyLinkedinUrl,
     headquarters:
       company?.location ||
-      jsonMeta.headquarters ||
+      metaText(meta, "headquarters") ||
       "",
     employee_count:
       company?.employee_count ||
-      jsonMeta.employee_count ||
+      metaText(meta, "employee_count") ||
       "",
     industry_niche:
       company?.industry ||
-      jsonMeta.industry_niche ||
+      metaText(meta, "industry_niche") ||
       "",
     value_proposition:
-      jsonMeta.value_proposition ||
+      metaText(meta, "value_proposition") ||
       "",
     contact_name: contactName,
     job_title: contactTitle,
     contact_title: contactTitle,
     linkedin_url: linkedinUrl,
     tenure_at_company:
-      jsonMeta.tenure_at_company ||
+      metaText(meta, "tenure_at_company") ||
       "",
     follower_count:
-      jsonMeta.follower_count ||
+      metaText(meta, "follower_count") ||
       "",
     work_email: workEmail,
     secondary_contact_name:
-      jsonMeta.secondary_contact_name ||
+      metaText(meta, "secondary_contact_name") ||
       "",
     secondary_contact_title:
-      jsonMeta.secondary_contact_title ||
+      metaText(meta, "secondary_contact_title") ||
       "",
     secondary_linkedin_url:
-      jsonMeta.secondary_linkedin_url ||
+      metaText(meta, "secondary_linkedin_url") ||
       "",
     tertiary_contact_name:
-      jsonMeta.tertiary_contact_name ||
+      metaText(meta, "tertiary_contact_name") ||
       "",
     tertiary_contact_title:
-      jsonMeta.tertiary_contact_title ||
+      metaText(meta, "tertiary_contact_title") ||
       "",
     tertiary_linkedin_url:
-      jsonMeta.tertiary_linkedin_url ||
+      metaText(meta, "tertiary_linkedin_url") ||
       "",
     buying_trigger: buyingTrigger,
     trigger_age:
-      jsonMeta.trigger_age ||
+      metaText(meta, "trigger_age") ||
       "",
     trigger_url: triggerUrl,
     intent_level:
-      jsonMeta.intent_level ||
+      metaText(meta, "intent_level") ||
       "Standard",
     recent_company_news:
-      jsonMeta.recent_company_news ||
+      metaText(meta, "recent_company_news") ||
       "",
     website_tech_stack:
       (company?.tech_stack && company.tech_stack.length > 0)
         ? company.tech_stack
-        : (jsonMeta.website_tech_stack && jsonMeta.website_tech_stack.length > 0)
-          ? jsonMeta.website_tech_stack
-          : [],
-    required_engineering_stack:
-      (jsonMeta.required_engineering_stack && jsonMeta.required_engineering_stack.length > 0)
-        ? jsonMeta.required_engineering_stack
-        : [],
+        : metaList(meta, "website_tech_stack"),
+    required_engineering_stack: metaList(meta, "required_engineering_stack"),
     recent_founder_activity:
-      jsonMeta.recent_founder_activity ||
+      metaText(meta, "recent_founder_activity") ||
       "",
     ai_icebreaker: aiIcebreaker,
     email_subject_line: emailSubjectLine,
     linkedin_note: linkedinNote,
     linkedin_message: linkedinMessage,
-    verification_status:
-      jsonMeta.verification_status ||
-      "Verified 100%",
+    // Unverified rows must not claim verification. Only an ingest pipeline that
+    // actually checked the contact may supply this string.
+    verification_status: metaText(meta, "verification_status"),
     source_attribution:
-      jsonMeta.source_attribution ||
+      metaText(meta, "source_attribution") ||
       triggerUrl ||
       website ||
       "",

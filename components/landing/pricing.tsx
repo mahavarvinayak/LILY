@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
+import { SUBSCRIPTION_TIERS } from "@/lib/constants";
 
 const tiers = [
   {
     name: "Starter",
     id: "starter",
-    price: 14000,
-    quota: "5 leads / day",
+    price: SUBSCRIPTION_TIERS.Starter.price,
+    quota: `${SUBSCRIPTION_TIERS.Starter.quota} leads / day`,
     volume: "~150 verified leads / month",
     description: "For boutique agencies testing an outbound niche with zero manual scraping.",
     features: [
@@ -23,10 +24,10 @@ const tiers = [
   {
     name: "Growth",
     id: "growth",
-    price: 29000,
-    quota: "15 leads / day",
+    price: SUBSCRIPTION_TIERS.Growth.price,
+    quota: `${SUBSCRIPTION_TIERS.Growth.quota} leads / day`,
     volume: "~400 verified leads / month",
-    description: "The primary agency plan. Replaces a ₹15,000/mo intern with verified pipeline.",
+    description: "The primary agency plan. Replaces two ₹15,000/mo sourcing interns with verified pipeline.",
     features: [
       "Everything in Starter",
       "15 verified leads/day (quota-governed)",
@@ -42,8 +43,8 @@ const tiers = [
   {
     name: "Scale",
     id: "scale",
-    price: 45000,
-    quota: "30 leads / day",
+    price: SUBSCRIPTION_TIERS.Scale.price,
+    quota: `${SUBSCRIPTION_TIERS.Scale.quota} leads / day`,
     volume: "~750+ verified leads / month",
     description: "For high-volume agency pods running multi-channel outbound and client sourcing.",
     features: [

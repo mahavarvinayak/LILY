@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { env } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getAuthSecret } from "@/lib/secrets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,13 +19,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, code } = (await request.json()) as { email?: string; code?: string };
+    const { email, code } = (await request.json()) as { email?: unknown; code?: unknown };
+    if (typeof email !== "string" || typeof code !== "string") {
+      return NextResponse.json({ ok: false, error: "Please enter your email and 6-digit code." }, { status: 400 });
+    }
     if (!email || !code) {
       return NextResponse.json({ ok: false, error: "Please enter your email and 6-digit code." }, { status: 400 });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      return NextResponse.json(
+        { ok: false, error: "Enter the 6-digit code exactly as it appears in the email." },
+        { status: 400 },
+      );
+    }
 
     const cookieHeader = request.headers.get("cookie") || "";
     const match = cookieHeader.match(/lily_otp_session=([^;]+)/);
@@ -64,6 +73,14 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    if (typeof challenge.code_hash !== "string" || !/^[0-9a-f]{64}$/i.test(challenge.code_hash)) {
+      console.error("[verify-otp] stored challenge has no usable code hash");
+      return NextResponse.json(
+        { ok: false, error: "Verification code expired. Please request a fresh 6-digit code." },
+        { status: 400 },
+      );
+    }
+
     if (challenge.email.toLowerCase() !== cleanEmail) {
       // A mismatched email is not a wrong guess against this challenge, so it
       // must not consume one of the five attempts.
@@ -74,18 +91,25 @@ export async function POST(request: Request) {
     }
 
     if (typeof challenge.attempts === "number" && challenge.attempts >= 5) {
-      await admin.from("auth_otps").delete().eq("id", sessionId);
+      // Keep the row. Deleting it would reset the durable per-email quota in
+      // send-otp and let an attacker start a fresh five-guess window whenever
+      // this challenge is exhausted.
       return NextResponse.json({
         ok: false,
         error: "Too many failed attempts. For security, please request a new verification code.",
       }, { status: 429 });
     }
 
-    const secret =
-      process.env.ENCRYPTION_SECRET ||
-      env.supabaseServiceRoleKey ||
-      env.supabaseAnonKey ||
-      "lily-otp-auth-secret-key-fallback";
+    let secret: string;
+    try {
+      secret = getAuthSecret();
+    } catch {
+      console.error("[verify-otp] authentication signing key is not configured");
+      return NextResponse.json(
+        { ok: false, error: "Authentication service is not configured." },
+        { status: 503 },
+      );
+    }
 
     const computedHash = crypto
       .createHmac("sha256", secret)
@@ -113,7 +137,8 @@ export async function POST(request: Request) {
     }
 
     if (typeof attemptsAfter === "number" && attemptsAfter >= 5) {
-      await admin.from("auth_otps").delete().eq("id", sessionId);
+      // Same reasoning as above: leave the saturated row in place so the
+      // per-email quota still sees it.
       return NextResponse.json({
         ok: false,
         error: "Too many failed attempts. For security, please request a new verification code.",
@@ -122,6 +147,7 @@ export async function POST(request: Request) {
 
     const isMatch =
       expectedBuffer.length === actualBuffer.length &&
+      actualBuffer.length > 0 &&
       crypto.timingSafeEqual(expectedBuffer, actualBuffer);
 
     if (!isMatch) {
@@ -131,7 +157,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    await admin.from("auth_otps").delete().eq("id", sessionId);
+    // Consume the challenge in place instead of deleting it: the row must stay
+    // countable for the per-email quota, and rotating the hash blocks replay of
+    // a code that was already used successfully.
+    await admin
+      .from("auth_otps")
+      .update({ code_hash: crypto.randomBytes(32).toString("hex"), attempts: 5 })
+      .eq("id", sessionId);
 
     const supabase = await createSupabaseServerClient();
     let userSession: { access_token: string; refresh_token: string } | null = null;
@@ -199,7 +231,10 @@ export async function POST(request: Request) {
     response.cookies.delete("lily_otp_session");
     return response;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Verification failed.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    console.error("[verify-otp] unexpected failure:", error);
+    return NextResponse.json(
+      { ok: false, error: "We could not verify that code. Please try again." },
+      { status: 500 },
+    );
   }
 }

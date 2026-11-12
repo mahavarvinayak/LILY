@@ -17,7 +17,7 @@ function Countdown() {
       const next =
         Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate(), 8) -
         19800000;
-      setRemaining(Math.max(0, Math.floor(((next > now ? next : next + 86400000) - now) / 1000)));
+      setRemaining(Math.max(0, Math.floor(((next >= now ? next : next + 86400000) - now) / 1000)));
     };
     update();
     const timer = setInterval(update, 1000);

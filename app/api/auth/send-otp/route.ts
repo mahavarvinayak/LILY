@@ -4,6 +4,7 @@ import { Resend } from "resend";
 import { env, isResendConfigured } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getAuthSecret } from "@/lib/secrets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,11 +112,16 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    const secret =
-      process.env.ENCRYPTION_SECRET ||
-      env.supabaseServiceRoleKey ||
-      env.supabaseAnonKey ||
-      "lily-otp-auth-secret-key-fallback";
+    let secret: string;
+    try {
+      secret = getAuthSecret();
+    } catch {
+      console.error("[send-otp] authentication signing key is not configured");
+      return NextResponse.json(
+        { ok: false, error: "Authentication service is not configured." },
+        { status: 503 },
+      );
+    }
 
     // Only addresses that already own an account may receive a code. Without
     // this check Supabase's admin `generateLink` would auto-create an account

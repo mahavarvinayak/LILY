@@ -8,11 +8,35 @@ import type { AgentResult, OpportunityRecord, Profile } from "@/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Drafting a full quota in chunks can exceed the default 10s edge budget. */
+export const maxDuration = 60;
 
 interface AgentBody {
   input?: string;
   command?: string;
   modelPreference?: "glm-4.7-flash" | "glm-4.5-flash";
+}
+
+const MODEL_PREFERENCES = new Set(["glm-4.7-flash", "glm-4.5-flash"]);
+
+/**
+ * Supabase resolves with `{ error }` rather than rejecting, so `allSettled`
+ * fulfilment alone does not mean the row was written. A failed update (RLS,
+ * network) must not be reported as a successful draft.
+ */
+function countSettledWrites(
+  results: PromiseSettledResult<{ error: { message?: string } | null }>[],
+): number {
+  let succeeded = 0;
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    if (result.value?.error) {
+      console.error("[agent] draft write failed", result.value.error.message);
+      continue;
+    }
+    succeeded += 1;
+  }
+  return succeeded;
 }
 
 function toDraftLead(opportunity: OpportunityRecord): DraftLead {
@@ -111,15 +135,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Please sign in again." }, { status: 401 });
   }
 
-  let body: AgentBody;
+  let parsedBody: unknown;
   try {
-    body = (await request.json()) as AgentBody;
+    parsedBody = await request.json();
   } catch {
     return NextResponse.json({ ok: false, message: "Invalid request body." }, { status: 400 });
   }
 
+  if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+    return NextResponse.json({ ok: false, message: "Invalid request body." }, { status: 400 });
+  }
+
+  const body = parsedBody as AgentBody;
+  if (body.input !== undefined && typeof body.input !== "string") {
+    return NextResponse.json({ ok: false, message: "Invalid request body." }, { status: 400 });
+  }
+  if (body.command !== undefined && typeof body.command !== "string") {
+    return NextResponse.json({ ok: false, message: "Invalid request body." }, { status: 400 });
+  }
+
+  const modelPreference =
+    typeof body.modelPreference === "string" && MODEL_PREFERENCES.has(body.modelPreference)
+      ? (body.modelPreference as "glm-4.7-flash" | "glm-4.5-flash")
+      : undefined;
+
   const input = (body.input ?? "").trim();
-  const command = body.command ?? (input.startsWith("/") ? input.split(/\s+/)[0] : undefined);
+  const command = body.command?.trim() || (input.startsWith("/") ? input.split(/\s+/)[0] : undefined);
   if (!input && !command) {
     return NextResponse.json({ ok: false, message: "Say something first." }, { status: 400 });
   }
@@ -168,31 +209,59 @@ export async function POST(request: Request) {
     .filter((opportunity) => opportunity.stage !== "Lost")
     .reduce((sum, opportunity) => sum + opportunity.deal_value, 0);
 
-  const quota = profile.daily_lead_quota || 15;
+  // A quota of 0 means the operator paused the workspace. `|| 15` would quietly
+  // hand a paused client the default allowance.
+  const quota = typeof profile.daily_lead_quota === "number" ? profile.daily_lead_quota : 15;
 
   const isDraftCommand = command === "/draft-all" || /^\/draft\b/i.test(input) || /^draft\s+(all|pitches|leads)\b/i.test(input);
   const isSlackCommand = command === "/notify-slack" || /^\/slack\b/i.test(input) || /^(send|post)\s+(a\s+)?slack\s+(digest|update|alert)/i.test(input);
   const isReengageCommand = command === "/re-engage-all" || /^\/re-?engage-all\b/i.test(input) || /^re-?engage\s+stalled/i.test(input);
 
   if (isDraftCommand) {
+    if (quota <= 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Workspace is paused by the operator. No drafts can be generated until the plan is reactivated.",
+          demo: false,
+        },
+        { status: 403 },
+      );
+    }
+
     const singleQuery = input
       .replace(/^\/draft(-all)?\s*/i, "")
       .replace(/^draft\s+(all|pitches|leads)?\s*/i, "")
       .trim();
 
-    let leadsToDraft = opportunities.filter((opportunity) => !opportunity.outreach_dispatched);
-    if (!leadsToDraft.length) leadsToDraft = opportunities;
+    let leadsToDraft = opportunities.filter(
+      (opportunity) => !opportunity.outreach_dispatched && opportunity.stage !== "Lost",
+    );
+    if (!leadsToDraft.length) {
+      leadsToDraft = opportunities.filter((opportunity) => opportunity.stage !== "Lost");
+    }
 
     if (singleQuery && singleQuery.length > 1) {
       const q = singleQuery.toLowerCase();
-      const matched = opportunities.find((o) =>
-        (o.company?.name || "").toLowerCase().includes(q) ||
-        (o.deal_name || "").toLowerCase().includes(q) ||
-        (o.person?.first_name || "").toLowerCase().includes(q),
+      const matched = opportunities.find(
+        (o) =>
+          o.stage !== "Lost" &&
+          ((o.company?.name || "").toLowerCase().includes(q) ||
+            (o.deal_name || "").toLowerCase().includes(q) ||
+            (o.person?.first_name || "").toLowerCase().includes(q)),
       );
-      if (matched) {
-        leadsToDraft = [matched];
+      if (!matched) {
+        // Asking for one account and silently drafting the whole book would
+        // burn tokens and overwrite drafts the user never approved.
+        return NextResponse.json({
+          ok: true,
+          command: "draft-all",
+          message: `No opportunity matched “${singleQuery}”. Name a company, deal or contact, or run \`/draft-all\` to cover the full drop.`,
+          updated: 0,
+          demo: false,
+        } satisfies AgentResult);
       }
+      leadsToDraft = [matched];
     } else {
       leadsToDraft = leadsToDraft.slice(0, quota);
     }
@@ -220,7 +289,7 @@ export async function POST(request: Request) {
           .eq("user_id", profile.id),
       ),
     );
-    const successful = updates.filter((u) => u.status === "fulfilled").length;
+    const successful = countSettledWrites(updates);
     const result: AgentResult = {
       ok: true,
       command: "draft-all",
@@ -289,7 +358,7 @@ export async function POST(request: Request) {
           .eq("user_id", profile.id),
       ),
     );
-    const successful = updates.filter((u) => u.status === "fulfilled").length;
+    const successful = countSettledWrites(updates);
     return NextResponse.json({
       ok: true,
       command: "re-engage",
@@ -355,7 +424,7 @@ export async function POST(request: Request) {
         return acc;
       }, {}),
     },
-    body.modelPreference,
+    modelPreference,
   );
 
   return NextResponse.json({

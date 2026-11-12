@@ -3,11 +3,13 @@ import type { OpportunityRecord, Company, Person } from "@/lib/types";
 
 function escapeCsvValue(val: unknown): string {
   if (val === null || val === undefined) return '""';
-  if (Array.isArray(val)) {
-    return `"${val.join("; ").replace(/"/g, '""')}"`;
-  }
-  const str = String(val).replace(/"/g, '""');
-  return `"${str}"`;
+
+  const raw = Array.isArray(val) ? val.join("; ") : String(val);
+
+  // CSV formula injection: Excel/Sheets evaluate a cell that starts with
+  // =, +, -, @, tab or CR. Every exported field is scraped/third-party text.
+  const guarded = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return `"${guarded.replace(/"/g, '""')}"`;
 }
 
 export function export31FieldsToCsv(
@@ -48,6 +50,7 @@ export function export31FieldsToCsv(
     "Recent Founder Activity",
     "LinkedIn Connection Angle",
     "Cold Outreach Subject",
+    "Cold Outreach Body",
     "Verification Status",
     "Source Attribution",
   ];
@@ -113,8 +116,9 @@ export function export31FieldsToCsv(
       escapeCsvValue(intel.website_tech_stack),
       escapeCsvValue(intel.required_engineering_stack),
       escapeCsvValue(intel.recent_founder_activity),
-      escapeCsvValue(intel.ai_icebreaker),
+      escapeCsvValue(intel.linkedin_note),
       escapeCsvValue(intel.email_subject_line),
+      escapeCsvValue(intel.ai_icebreaker),
       escapeCsvValue(intel.verification_status),
       escapeCsvValue(intel.source_attribution),
     ];
@@ -124,7 +128,14 @@ export function export31FieldsToCsv(
   const csvContent = "\uFEFF" + rows.join("\r\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const dateStr = new Date().toISOString().split("T")[0];
+  // Stamp the filename in the business timezone, not UTC: before 05:30 IST a
+  // UTC date is still "yesterday" and two same-morning exports collide.
+  const dateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
   const a = document.createElement("a");
   a.href = url;
   a.download = `${filenamePrefix}_${dateStr}.csv`;

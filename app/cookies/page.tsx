@@ -58,11 +58,6 @@ export default function CookiesPage() {
                       <td className="p-3">LILY encrypted authentication session token</td>
                       <td className="p-3">Session / 30 Days</td>
                     </tr>
-                    <tr>
-                      <td className="p-3 text-foreground">lily_theme</td>
-                      <td className="p-3">Workspace theme preference (Dark / Light)</td>
-                      <td className="p-3">1 Year</td>
-                    </tr>
                   </tbody>
                 </table>
               </div>

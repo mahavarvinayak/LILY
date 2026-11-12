@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   QueryClient,
   QueryClientProvider,
+  useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import {
@@ -17,6 +18,7 @@ import {
   UserCheck,
   ShieldCheck,
   LayoutDashboard,
+  Sparkles,
   Plug,
   Settings,
   PanelLeft,
@@ -29,6 +31,8 @@ import { parseIcpConfig } from "@/lib/icp";
 import { LilyLogo } from "@/components/lily/lily-mark";
 import { LilyLoader } from "@/components/lily/lily-loader";
 import { ActivityCenter } from "@/components/app/activity-center";
+import { AgentBar } from "@/components/app/agent-bar";
+import { WorkspaceErrorBoundary } from "@/app/dashboard/workspace-error-boundary";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -53,6 +57,7 @@ const getNavGroups = (isAdmin: boolean) => [
   {
     label: "Command",
     items: [
+      { label: "LILY Chat", href: "/dashboard", icon: Sparkles },
       { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
       { label: "Opportunities", href: "/dashboard/opportunities", icon: Target },
       { label: "Outreach Studio", href: "/dashboard/outreach", icon: Send },
@@ -83,6 +88,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { data } = useSuspenseQuery(workspaceQuery());
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -307,6 +313,8 @@ function DashboardShell({ children }: { children: ReactNode }) {
           </Button>
 
           <button
+            type="button"
+            aria-label="Search deals, companies and people"
             className="flex min-w-0 max-w-xl flex-1 items-center gap-3 rounded-xl border border-border-strong bg-surface/60 px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
             onClick={() => setSearchOpen(true)}
           >
@@ -358,7 +366,14 @@ function DashboardShell({ children }: { children: ReactNode }) {
         <main className="p-4 pb-24 md:p-8 md:pb-28">{children}</main>
       </div>
 
-      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+      <Dialog
+        open={searchOpen}
+        onOpenChange={(open) => {
+          setSearchOpen(open);
+          // Clear the query when the palette closes so the next ⌘K starts fresh.
+          if (!open) setQ("");
+        }}
+      >
         <DialogContent className="max-w-xl p-0 overflow-hidden">
           <DialogHeader className="p-4 border-b border-border">
             <DialogTitle className="sr-only">Quick search</DialogTitle>
@@ -399,25 +414,34 @@ function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AgentBar />
     </div>
   );
 }
 
-export const dynamic = "force-dynamic";
-
-const queryClient = new QueryClient({
+const queryClientOptions = {
   defaultOptions: {
     queries: {
       staleTime: 30000,
       retry: 1,
     },
   },
-});
+};
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  // Create the client per browser session. A module-level QueryClient is also
+  // evaluated during SSR, where the instance would be shared by every request
+  // and could serve one user's cached workspace to another.
+  const [queryClient] = useState(() => new QueryClient(queryClientOptions));
+
   return (
     <QueryClientProvider client={queryClient}>
-      <DashboardShell>{children}</DashboardShell>
+      <WorkspaceErrorBoundary>
+        <Suspense fallback={<LilyLoader label="Opening your workspace" />}>
+          <DashboardShell>{children}</DashboardShell>
+        </Suspense>
+      </WorkspaceErrorBoundary>
     </QueryClientProvider>
   );
 }

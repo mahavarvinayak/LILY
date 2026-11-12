@@ -9,6 +9,18 @@ export interface SlackLead {
   value: number;
 }
 
+/**
+ * Slack mrkdwn treats &, < and > as control characters, so lead fields written
+ * by users must be escaped or they can break the message (or inject a link /
+ * mention). Escape & first, otherwise the later replacements get double-escaped.
+ */
+function escapeMrkdwn(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export async function sendSlackDigest(
   webhookUrl: string | null | undefined,
   payload: { agencyName: string; leads: SlackLead[]; pipelineValue: number; quota: number },
@@ -19,7 +31,7 @@ export async function sendSlackDigest(
   const total = payload.leads.reduce((sum, lead) => sum + lead.value, 0);
   const lines = payload.leads.slice(0, 6).map(
     (lead) =>
-      `• *${lead.company}* — ${lead.person}, ${lead.role}\n   _⚡ ${lead.trigger}_ · ${formatInr(lead.value, true)}`,
+      `• *${escapeMrkdwn(lead.company)}* — ${escapeMrkdwn(lead.person)}, ${escapeMrkdwn(lead.role)}\n   _⚡ ${escapeMrkdwn(lead.trigger)}_ · ${formatInr(lead.value, true)}`,
   );
 
   const blocks = [
@@ -32,7 +44,7 @@ export async function sendSlackDigest(
       elements: [
         {
           type: "mrkdwn",
-          text: `${payload.agencyName} · ${payload.quota}-lead quota · *${formatInr(total, true)}* new pipeline`,
+          text: `${escapeMrkdwn(payload.agencyName)} · ${payload.quota}-lead quota · *${formatInr(total, true)}* new pipeline`,
         },
       ],
     },
@@ -68,7 +80,7 @@ export async function sendSlackDigest(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `LILY drop for ${payload.agencyName}: ${payload.leads.length} new leads, ${formatInr(total, true)} pipeline.`,
+        text: `LILY drop for ${escapeMrkdwn(payload.agencyName)}: ${payload.leads.length} new leads, ${formatInr(total, true)} pipeline.`,
         blocks,
       }),
       signal: AbortSignal.timeout(12000),

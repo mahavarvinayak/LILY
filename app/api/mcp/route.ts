@@ -18,6 +18,28 @@ function getTomorrow8amIST(): string {
   return istNow.toISOString();
 }
 
+type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+/**
+ * Every tool that takes a `client_id` must confirm it is a real *client*
+ * workspace. Without this an operator token could be pointed at another
+ * operator's profile (or any uuid) and read/write rows that are not a client's.
+ */
+async function isClientWorkspace(admin: AdminClient, clientId: string): Promise<boolean> {
+  if (!admin || !clientId) return false;
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", clientId)
+    .eq("role", "client")
+    .maybeSingle();
+  if (error) {
+    console.error("[mcp] client lookup failed", error.message);
+    return false;
+  }
+  return Boolean(data);
+}
+
 async function verifyMcpAuth(
   request: Request,
   admin: ReturnType<typeof createSupabaseAdminClient>,
@@ -271,6 +293,38 @@ export async function POST(request: Request) {
         });
       }
 
+      if (!(await isClientWorkspace(admin, clientId))) {
+        return NextResponse.json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: "Unknown client workspace." },
+        });
+      }
+
+      const rawDealValue = args.deal_value;
+      const dealValue = rawDealValue === undefined || rawDealValue === null ? 0 : Number(rawDealValue);
+      if (!Number.isFinite(dealValue) || dealValue < 0 || dealValue > 1_000_000_000) {
+        return NextResponse.json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: "deal_value must be a non-negative number." },
+        });
+      }
+
+      const rawScheduledAt = String(args.scheduled_at ?? "").trim();
+      let scheduledAt = getTomorrow8amIST();
+      if (rawScheduledAt) {
+        const parsedScheduledAt = new Date(rawScheduledAt);
+        if (Number.isNaN(parsedScheduledAt.getTime())) {
+          return NextResponse.json({
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32602, message: "scheduled_at must be an ISO-8601 timestamp." },
+          });
+        }
+        scheduledAt = parsedScheduledAt.toISOString();
+      }
+
       const website = String(args.website || "").trim();
       const domain = website ? domainFromWebsite(website) : null;
       const location = String(args.headquarters || "").trim() || null;
@@ -280,11 +334,12 @@ export async function POST(request: Request) {
 
       let companyId: string | null = null;
       if (domain) {
+        const safeDomain = domain.toLowerCase().replace(/[\\%_]/g, (char) => `\\${char}`);
         const { data: existingCompany } = await admin
           .from("companies")
           .select("id")
           .eq("user_id", clientId)
-          .ilike("domain", domain.toLowerCase())
+          .ilike("domain", safeDomain)
           .maybeSingle();
         companyId = existingCompany?.id ?? null;
       }
@@ -428,9 +483,6 @@ export async function POST(request: Request) {
         }
       }
 
-      const scheduledAt = String(args.scheduled_at || getTomorrow8amIST()).trim();
-      const dealValue = Number(args.deal_value || 0);
-
       const intelPayload: LeadIntelligence31 = {
         company_name: companyName,
         website: website || "",
@@ -463,7 +515,7 @@ export async function POST(request: Request) {
         recent_founder_activity: String(args.recent_founder_activity || ""),
         ai_icebreaker: String(args.ai_icebreaker || ""),
         email_subject_line: String(args.email_subject_line || `Regarding ${companyName}`),
-        verification_status: String(args.verification_status || "Verified 100%"),
+        verification_status: String(args.verification_status || ""),
         source_attribution: String(args.source_attribution || args.trigger_url || website || ""),
       };
 
@@ -538,6 +590,14 @@ export async function POST(request: Request) {
         });
       }
 
+      if (!(await isClientWorkspace(admin, clientId))) {
+        return NextResponse.json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: "Unknown client workspace." },
+        });
+      }
+
       const nowIso = new Date().toISOString();
       const { data: updated, error } = await admin
         .from("opportunities")
@@ -579,6 +639,14 @@ export async function POST(request: Request) {
           jsonrpc: "2.0",
           id,
           error: { code: -32602, message: "client_id is required." },
+        });
+      }
+
+      if (!(await isClientWorkspace(admin, clientId))) {
+        return NextResponse.json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: "Unknown client workspace." },
         });
       }
 
@@ -634,6 +702,7 @@ export async function POST(request: Request) {
         .from("profiles")
         .select("id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier")
         .eq("id", clientId)
+        .eq("role", "client")
         .maybeSingle();
 
       if (error || !client) {

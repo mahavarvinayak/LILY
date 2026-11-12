@@ -8,6 +8,7 @@ export interface Profile {
   id: string;
   agency_name: string;
   contact_email: string;
+  role: Role;
   target_niche: string | null;
   daily_lead_quota: number;
   slack_webhook_url: string | null;
