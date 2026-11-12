@@ -11,7 +11,7 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "LILY <outreach@lily.os>",
   slackWebhookUrl: process.env.SLACK_WEBHOOK_URL ?? "",
-  appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://lily-dusky.vercel.app",
+  appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://lilycrm.dpdns.org",
 };
 
 export function isSupabaseConfigured() {

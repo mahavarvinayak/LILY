@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   description:
     "The autonomous B2B revenue pipeline for digital agencies. Verified, trigger-matched decision-makers and AI outreach delivered to your private workspace at 08:00 IST.",
   applicationName: "LILY",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://lily-dusky.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://lilycrm.dpdns.org"),
   icons: {
     icon: [
       { url: "/favicon.svg?v=6", type: "image/svg+xml" },
