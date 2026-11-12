@@ -15,7 +15,7 @@ import {
   Users,
   CheckSquare,
   UserCheck,
-  MessageCircle,
+  ShieldCheck,
   LayoutDashboard,
   Plug,
   Settings,
@@ -28,8 +28,6 @@ import { workspaceQuery } from "@/lib/workspace";
 import { parseIcpConfig } from "@/lib/icp";
 import { LilyLogo } from "@/components/lily/lily-mark";
 import { LilyLoader } from "@/components/lily/lily-loader";
-import { AgentBar } from "@/components/app/agent-bar";
-import { MorningDropModal } from "@/components/app/morning-drop-modal";
 import { ActivityCenter } from "@/components/app/activity-center";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -51,11 +49,10 @@ import { initials, cn, nameFromEmail } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
-const navGroups = [
+const getNavGroups = (isAdmin: boolean) => [
   {
     label: "Command",
     items: [
-      { label: "Assistant", href: "/dashboard", icon: MessageCircle },
       { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
       { label: "Opportunities", href: "/dashboard/opportunities", icon: Target },
       { label: "Outreach Studio", href: "/dashboard/outreach", icon: Send },
@@ -73,13 +70,14 @@ const navGroups = [
   {
     label: "System",
     items: [
+      ...(isAdmin
+        ? [{ label: "Operator Admin", href: "/dashboard/admin", icon: ShieldCheck }]
+        : []),
       { label: "Connectors", href: "/dashboard/connectors", icon: Plug },
       { label: "Settings", href: "/dashboard/settings", icon: Settings },
     ],
   },
 ];
-
-const nav = navGroups.flatMap((group) => group.items);
 
 function DashboardShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -89,6 +87,9 @@ function DashboardShell({ children }: { children: ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState("");
+
+  const navGroups = getNavGroups(data.isAdmin);
+  const nav = navGroups.flatMap((group) => group.items);
 
   const isIcpConfigured = Boolean(parseIcpConfig(data.profile?.target_niche)?.completed);
   const needsCalibration = !data.pending && !isIcpConfigured && !data.isAdmin;
@@ -114,10 +115,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
   const counts: Record<string, number> = {
     "/dashboard/opportunities": data.opportunities.length,
-    "/dashboard/outreach": data.opportunities.filter((o) => {
-      const p = Array.isArray(o.person) ? o.person[0] : o.person;
-      return Boolean(p?.email && !o.outreach_dispatched);
-    }).length,
+    "/dashboard/outreach": data.opportunities.filter((o) => !o.outreach_dispatched).length,
     "/dashboard/companies": data.companies.length,
     "/dashboard/people": data.people.length,
     "/dashboard/tasks": data.tasks.filter((t) => !t.completed).length,
@@ -192,9 +190,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
                               "rounded-md px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
                               active
                                 ? "bg-primary/20 text-primary"
-                                : n.href === "/dashboard/outreach" && count > 0
-                                  ? "bg-amber-500/15 text-amber-300"
-                                  : "bg-white/5 text-muted-foreground",
+                                : "bg-white/5 text-muted-foreground",
                             )}
                           >
                             {count}
@@ -360,8 +356,6 @@ function DashboardShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="p-4 pb-24 md:p-8 md:pb-28">{children}</main>
-        <MorningDropModal />
-        <AgentBar />
       </div>
 
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>

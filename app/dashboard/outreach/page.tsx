@@ -81,11 +81,11 @@ export default function OutreachStudioPage() {
 
   const verifiedLeads = allQueueLeads.filter((item) => item.hasEmail);
   const dispatchedLeads = allQueueLeads.filter((item) => item.opp.outreach_dispatched);
-  const readyLeads = allQueueLeads.filter((item) => item.hasEmail && !item.opp.outreach_dispatched);
+  const readyLeads = allQueueLeads.filter((item) => !item.opp.outreach_dispatched);
 
   const tabFilteredLeads = allQueueLeads.filter((item) => {
     if (filterTab === "has-email") return item.hasEmail;
-    if (filterTab === "ready") return item.hasEmail && !item.opp.outreach_dispatched;
+    if (filterTab === "ready") return !item.opp.outreach_dispatched;
     if (filterTab === "dispatched") return item.opp.outreach_dispatched;
     return true;
   });
@@ -315,9 +315,9 @@ export default function OutreachStudioPage() {
           tone="sky"
         />
         <StatTile
-          label="Ready to send"
+          label="Actionable queue"
           value={readyCount}
-          hint="Verified email awaiting send"
+          hint="Leads ready for outreach"
           icon={Send}
           tone="primary"
         />

@@ -57,31 +57,48 @@ export async function fetchWorkspace(): Promise<WorkspaceData> {
 
   const supabase = getSupabase();
   const userId = await requireUserId();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userEmail = user?.email?.toLowerCase() ?? "";
+
+  let effectiveAgencyId = userId;
+  if (userEmail) {
+    const { data: memberRow } = await supabase
+      .from("team_members")
+      .select("agency_id")
+      .eq("email", userEmail)
+      .maybeSingle();
+    if (memberRow?.agency_id) {
+      effectiveAgencyId = memberRow.agency_id;
+    }
+  }
+
   const [profileRes, companiesRes, peopleRes, oppsRes, tasksRes, teamRes, activitiesRes] =
     await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-      supabase.from("companies").select("*").eq("user_id", userId).order("name"),
-      supabase.from("people").select("*").eq("user_id", userId).order("first_name"),
+      supabase.from("profiles").select("*").eq("id", effectiveAgencyId).maybeSingle(),
+      supabase.from("companies").select("*").eq("user_id", effectiveAgencyId).order("name"),
+      supabase.from("people").select("*").eq("user_id", effectiveAgencyId).order("first_name"),
       supabase
         .from("opportunities")
         .select("*, company:companies(*), person:people(*)")
-        .eq("user_id", userId)
+        .eq("user_id", effectiveAgencyId)
         .lte("scheduled_at", new Date().toISOString())
         .order("scheduled_at", { ascending: false }),
       supabase
         .from("tasks")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", effectiveAgencyId)
         .order("due_at", { ascending: true, nullsFirst: false }),
       supabase
         .from("team_members")
         .select("*")
-        .eq("agency_id", userId)
+        .eq("agency_id", effectiveAgencyId)
         .order("joined_at", { ascending: true }),
       supabase
         .from("activity_logs")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", effectiveAgencyId)
         .order("created_at", { ascending: false })
         .limit(30),
     ]);
@@ -357,6 +374,18 @@ export const api = {
   async removeTeamMember(id: string) {
     const supabase = getSupabase();
     check(await supabase.from("team_members").delete().eq("id", id));
+  },
+  async submitPaymentUtr(utr: string) {
+    const res = await fetch("/api/payment/submit-utr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ utr }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Failed to submit UTR.");
+    }
+    return data;
   },
 };
 

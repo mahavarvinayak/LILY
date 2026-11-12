@@ -68,6 +68,11 @@ export async function POST(request: Request) {
       const safeAgency = escapeHtml(agencyName);
       const safeRole = escapeHtml(role);
 
+      const host =
+        request.headers.get("x-forwarded-host") || request.headers.get("host") || "lilycrm.in";
+      const proto = request.headers.get("x-forwarded-proto") || "https";
+      const loginUrl = `${proto}://${host}/login?email=${encodeURIComponent(email)}`;
+
       await resend.emails.send({
         from: env.resendFromEmail,
         to: [email],
@@ -75,11 +80,19 @@ export async function POST(request: Request) {
         html: `<div style="font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.6;color:#18181b;max-width:560px;margin:0 auto;padding:24px 16px;">
           <h2 style="font-size:20px;font-weight:700;color:#09090b;margin-bottom:12px;">Welcome to the team, ${safeName}</h2>
           <p style="margin:0 0 16px;">${safeAgency} has added you as <strong>${safeRole}</strong> to their active sales roster on the LILY Revenue OS.</p>
-          <p style="margin:0 0 16px;">Your deal opportunities, lead batches, and accounts are managed through your agency leadership.</p>
+          <p style="margin:0 0 20px;">You have immediate access to your agency's verified accounts, decision makers, and outreach pipeline.</p>
+          <div style="margin:24px 0;">
+            <a href="${loginUrl}" style="background-color:#10b981;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
+              Enter ${safeAgency} Workspace →
+            </a>
+          </div>
+          <p style="font-size:13px;color:#71717a;margin:0 0 16px;">
+            Sign in using your email OTP. No password required.
+          </p>
           <hr style="border:0;border-top:1px solid #e4e4e7;margin:24px 0;" />
           <p style="font-size:12px;color:#71717a;margin:0;">LILY Revenue OS · Autonomous B2B Lead Intelligence</p>
         </div>`,
-        text: `Hi ${name},\n\n${agencyName} has added you as ${role} to their active sales roster on LILY Revenue OS.\n\nYour lead batches and pipeline accounts are coordinated through your agency leadership.\n\n— LILY Revenue OS`,
+        text: `Hi ${name},\n\n${agencyName} has added you as ${role} to their active sales roster on LILY Revenue OS.\n\nLog in here to enter your workspace: ${loginUrl}\n\nSign in with your email OTP to start.\n\n— LILY Revenue OS`,
       });
       emailSent = true;
     } catch {}

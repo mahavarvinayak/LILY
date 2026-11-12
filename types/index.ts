@@ -13,6 +13,9 @@ export interface Profile {
   daily_lead_quota: number;
   slack_webhook_url: string | null;
   subscription_tier: SubscriptionTier;
+  payment_utr?: string | null;
+  payment_verified?: boolean;
+  payment_amount?: number;
   verified_at?: string | null;
   created_at: string;
 }

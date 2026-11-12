@@ -13,7 +13,6 @@ import {
   Check,
   Download,
   Wallet,
-  Mail,
   Radar,
   Target,
 } from "lucide-react";
@@ -58,18 +57,55 @@ function OpportunitiesContent() {
   const qParam = searchParams.get("q") || "";
 
   const [q, setQ] = useState(qParam);
+  const [selectedCohort, setSelectedCohort] = useState<"today" | "yesterday" | "all">("today");
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
   const reduced = useReducedMotion();
   const update = useWorkspaceMutation(api.updateStage);
   const optimistic = useOptimistic();
 
+  const kolkataFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+  const todayStr = kolkataFormatter.format(new Date());
+  const yesterdayStr = kolkataFormatter.format(new Date(Date.now() - 86400000));
+
+  const allDropDates = Array.from(
+    new Set(
+      data.opportunities.map((o) =>
+        kolkataFormatter.format(new Date(o.scheduled_at || o.created_at)),
+      ),
+    ),
+  ).sort().reverse();
+
+  const latestDropDate = allDropDates[0] || todayStr;
+
+  const todayOpps = data.opportunities.filter((o) => {
+    const dStr = kolkataFormatter.format(new Date(o.scheduled_at || o.created_at));
+    return dStr === todayStr || (!allDropDates.includes(todayStr) && dStr === latestDropDate);
+  });
+
+  const yesterdayOpps = data.opportunities.filter((o) => {
+    const dStr = kolkataFormatter.format(new Date(o.scheduled_at || o.created_at));
+    return dStr === yesterdayStr;
+  });
+
+  const activeCohortOpps =
+    selectedCohort === "today"
+      ? (todayOpps.length ? todayOpps : data.opportunities)
+      : selectedCohort === "yesterday"
+        ? yesterdayOpps
+        : data.opportunities;
+
+  const totalCohort = activeCohortOpps.length;
+  const contactedCohort = activeCohortOpps.filter(
+    (o) => o.outreach_dispatched || o.stage !== "New Lead",
+  ).length;
+  const completionRate = totalCohort > 0 ? Math.round((contactedCohort / totalCohort) * 100) : 0;
+
   const selected = data.opportunities.find((o) => o.id === leadParam);
   const pipelineValue = data.opportunities.reduce((sum, o) => sum + o.deal_value, 0);
   const openDeals = data.opportunities.filter(
     (o) => o.stage !== "Lost" && o.stage !== "Customer",
   );
-  const verifiedForOutreach = data.opportunities.filter((o) => Boolean(o.person?.email)).length;
   const newLeads = data.opportunities.filter((o) => o.stage === "New Lead").length;
 
   const move = (id: string, stage: Stage) => {
@@ -118,10 +154,10 @@ function OpportunitiesContent() {
           tone="primary"
         />
         <StatTile
-          label="Ready for outreach"
-          value={verifiedForOutreach}
-          hint="Verified emails on file"
-          icon={Mail}
+          label="Ready for LinkedIn"
+          value={data.opportunities.filter((o) => !o.outreach_dispatched).length}
+          hint="Actionable profiles ready"
+          icon={Target}
           tone="sky"
         />
         <StatTile
@@ -132,6 +168,65 @@ function OpportunitiesContent() {
           tone="amber"
         />
       </div>
+
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface/40 p-3">
+        <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface/70 p-1">
+          <button
+            type="button"
+            onClick={() => setSelectedCohort("today")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs transition-colors",
+              selectedCohort === "today"
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Today&apos;s Drop ({todayOpps.length || data.opportunities.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCohort("yesterday")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs transition-colors",
+              selectedCohort === "yesterday"
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Yesterday ({yesterdayOpps.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCohort("all")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs transition-colors",
+              selectedCohort === "all"
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            All Pipeline ({data.opportunities.length})
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <span className="text-[11px] font-medium text-muted-foreground block">
+              Daily Target: {contactedCohort} of {totalCohort} Contacted
+            </span>
+            <div className="mt-1 h-1.5 w-36 rounded-full bg-border overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                style={{ width: `${completionRate}%` }}
+              />
+            </div>
+          </div>
+          <span className="font-mono text-xs font-semibold text-emerald-400">
+            {completionRate}%
+          </span>
+        </div>
+      </div>
+
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Input
           className="max-w-md"
@@ -181,7 +276,7 @@ function OpportunitiesContent() {
       )}
       <div className="flex gap-4 overflow-x-auto pb-6 snap-x" aria-label="Opportunity board">
         {stages.map((stage) => {
-          const rows = data.opportunities.filter(
+          const rows = activeCohortOpps.filter(
             (o) =>
               o.stage === stage &&
               `${o.deal_name} ${o.company?.name || ""} ${o.buying_trigger}`
@@ -245,19 +340,36 @@ function OpportunitiesContent() {
                       className="w-full text-left"
                       onClick={() => openDossier(o.id)}
                     >
-                      <div className="mb-2 flex items-center gap-2">
-                        <CompanyFavicon
-                          domain={o.company?.domain}
-                          website={o.company?.website}
-                          name={o.company?.name || o.deal_name}
-                          size={20}
-                        />
-                        <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
-                          {o.company?.name || "Opportunity"}
-                        </p>
-                        <Pill tone={stageToneFor(o.stage)} className="ml-auto shrink-0">
-                          {STAGE_META[o.stage].short}
-                        </Pill>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <CompanyFavicon
+                            domain={o.company?.domain}
+                            website={o.company?.website}
+                            name={o.company?.name || o.deal_name}
+                            size={20}
+                          />
+                          <p className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[.14em] text-muted-foreground">
+                            {o.company?.name || "Opportunity"}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 font-mono text-[9px] font-semibold shrink-0",
+                            kolkataFormatter.format(new Date(o.scheduled_at || o.created_at)) === todayStr ||
+                              (!allDropDates.includes(todayStr) &&
+                                kolkataFormatter.format(new Date(o.scheduled_at || o.created_at)) ===
+                                  latestDropDate)
+                              ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                              : "border border-border bg-white/5 text-muted-foreground",
+                          )}
+                        >
+                          {kolkataFormatter.format(new Date(o.scheduled_at || o.created_at)) === todayStr ||
+                          (!allDropDates.includes(todayStr) &&
+                            kolkataFormatter.format(new Date(o.scheduled_at || o.created_at)) ===
+                              latestDropDate)
+                            ? "Today"
+                            : formatDate(o.scheduled_at)}
+                        </span>
                       </div>
                       <h3 className="break-words font-display text-lg leading-snug">{o.deal_name}</h3>
                       <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
@@ -267,9 +379,9 @@ function OpportunitiesContent() {
                         <span className="text-sm font-semibold tabular-nums text-primary">
                           {formatInr(o.deal_value, true)}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {formatDate(o.scheduled_at)}
-                        </span>
+                        <Pill tone={stageToneFor(o.stage)} className="shrink-0 text-[10px]">
+                          {STAGE_META[o.stage].short}
+                        </Pill>
                       </div>
                     </button>
                     <select

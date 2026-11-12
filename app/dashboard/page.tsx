@@ -1,8 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { AiAssistantView } from "@/components/app/ai-assistant-view";
+export const dynamic = "force-dynamic";
 
-export default function DashboardAssistantPage() {
-  return <AiAssistantView />;
+export default function DashboardPage() {
+  redirect("/dashboard/overview");
 }
-

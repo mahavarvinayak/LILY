@@ -936,11 +936,11 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </div>
                     <div className="mt-4 space-y-3 text-sm">
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">01. Company Name</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Company Name</span>
                         <span className="font-medium text-foreground">{currentIntel.company_name}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">02. Domain / Website</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Domain / Website</span>
                         {currentIntel.website ? (
                           <a
                             href={currentIntel.website}
@@ -956,7 +956,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         )}
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">03. Company LinkedIn</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Company LinkedIn</span>
                         {currentIntel.company_linkedin_url ? (
                           <a
                             href={currentIntel.company_linkedin_url}
@@ -972,19 +972,19 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         )}
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">04. Headquarters</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Headquarters</span>
                         <span className="text-foreground">{currentIntel.headquarters || "—"}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">05. Employee Headcount</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Employee Headcount</span>
                         <span className="font-mono text-foreground">{currentIntel.employee_count || "—"}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">06. Industry Niche</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Industry / Niche</span>
                         <span className="text-foreground">{currentIntel.industry_niche || "—"}</span>
                       </div>
                       <div className="pt-1">
-                        <span className="shrink-0 text-xs text-muted-foreground">07. Value Proposition</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Value Proposition</span>
                         <p className="mt-1.5 text-xs leading-relaxed text-foreground">
                           {currentIntel.value_proposition || "—"}
                         </p>
@@ -1005,15 +1005,15 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </div>
                     <div className="mt-4 space-y-3 text-sm">
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">08. Contact Name</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Contact Name</span>
                         <span className="font-semibold text-foreground">{currentIntel.contact_name}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">09. Job Title</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Job Title</span>
                         <span className="text-foreground">{currentIntel.job_title}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">10. Personal LinkedIn</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Personal LinkedIn</span>
                         {currentIntel.linkedin_url ? (
                           <a
                             href={currentIntel.linkedin_url}
@@ -1029,15 +1029,15 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                         )}
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">11. Tenure at Company</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Tenure at Company</span>
                         <span className="text-foreground">{currentIntel.tenure_at_company || "—"}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">12. Follower Count</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Follower Count</span>
                         <span className="font-mono text-foreground">{currentIntel.follower_count || "—"}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 pt-1 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">13. Corporate Work Email</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Corporate Work Email</span>
                         {currentIntel.work_email ? (
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="break-all text-right font-mono text-primary">
@@ -1074,15 +1074,15 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     {currentIntel.secondary_contact_name ? (
                       <div className="mt-4 space-y-3 text-sm">
                         <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                          <span className="shrink-0 text-xs text-muted-foreground">14. Contact Name</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">Contact Name</span>
                           <span className="font-semibold text-foreground">{currentIntel.secondary_contact_name}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                          <span className="shrink-0 text-xs text-muted-foreground">15. Designation</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">Designation</span>
                           <span className="text-foreground">{currentIntel.secondary_contact_title || "Executive"}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3 pt-1 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                          <span className="shrink-0 text-xs text-muted-foreground">16. Personal LinkedIn</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">Personal LinkedIn</span>
                           {currentIntel.secondary_linkedin_url ? (
                             <a
                               href={currentIntel.secondary_linkedin_url}
@@ -1117,15 +1117,15 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     {currentIntel.tertiary_contact_name ? (
                       <div className="mt-4 space-y-3 text-sm">
                         <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                          <span className="shrink-0 text-xs text-muted-foreground">17. Contact Name</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">Contact Name</span>
                           <span className="font-semibold text-foreground">{currentIntel.tertiary_contact_name}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                          <span className="shrink-0 text-xs text-muted-foreground">18. Designation</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">Designation</span>
                           <span className="text-foreground">{currentIntel.tertiary_contact_title || "Technical Lead"}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3 pt-1 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                          <span className="shrink-0 text-xs text-muted-foreground">19. Personal LinkedIn</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">Personal LinkedIn</span>
                           {currentIntel.tertiary_linkedin_url ? (
                             <a
                               href={currentIntel.tertiary_linkedin_url}
@@ -1159,23 +1159,23 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </div>
                     <div className="mt-4 space-y-3 text-sm">
                       <div>
-                        <span className="shrink-0 text-xs text-muted-foreground">20. Buying Trigger</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Buying Signal</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.buying_trigger}
                         </p>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">21. Trigger Age / Timestamp</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Signal Age</span>
                         <span className="font-mono text-foreground">{currentIntel.trigger_age || "Active"}</span>
                       </div>
                       <div className="flex items-start justify-between gap-3 border-b border-border pb-2 [&>span:last-child]:min-w-0 [&>span:last-child]:break-words [&>span:last-child]:text-right">
-                        <span className="shrink-0 text-xs text-muted-foreground">22. Intent Level</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Intent Level</span>
                         <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary">
                           {currentIntel.intent_level}
                         </span>
                       </div>
                       <div className="pt-1">
-                        <span className="shrink-0 text-xs text-muted-foreground">24. Recent Company News / Expansion</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Recent Company News</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.recent_company_news || "—"}
                         </p>
@@ -1187,7 +1187,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                 <TabsContent value="tech" className="space-y-4 pt-4">
                   <Panel>
                     <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                      25. Website Tech Stack Footprint
+                      Website Tech Stack
                     </span>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {currentIntel.website_tech_stack.length ? (
@@ -1207,7 +1207,7 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
 
                   <Panel>
                     <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                      26. Required Engineering Stack (From Active Hiring)
+                      Required Engineering Stack (From Hiring)
                     </span>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {currentIntel.required_engineering_stack.length ? (
@@ -1233,31 +1233,31 @@ export function DirectoryPage({ kind }: { kind: "companies" | "people" }) {
                     </span>
                     <div className="mt-4 space-y-3 text-sm">
                       <div>
-                        <span className="shrink-0 text-xs text-muted-foreground">27. Recent Founder Post Context</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Founder Activity</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.recent_founder_activity || "—"}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">28. Cold Email Subject Line</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Cold Email Subject</span>
                         <p className="mt-1 font-mono text-xs text-foreground">
                           {currentIntel.email_subject_line}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">29. Cold Email Pitch</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">Cold Email Pitch</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground whitespace-pre-line">
                           {currentIntel.ai_icebreaker}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">30. LinkedIn Connection Note (under 300 chars)</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">LinkedIn Connection Angle</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground">
                           {currentIntel.linkedin_note || "—"}
                         </p>
                       </div>
                       <div className="border-t border-border pt-3">
-                        <span className="shrink-0 text-xs text-muted-foreground">31. LinkedIn InMail / DM Pitch</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">LinkedIn Pitch / InMail</span>
                         <p className="mt-1 text-xs leading-relaxed text-foreground whitespace-pre-line">
                           {currentIntel.linkedin_message || "—"}
                         </p>
@@ -1614,7 +1614,48 @@ export function SettingsPage() {
               <dd className="mt-1">08:00 IST</dd>
             </div>
           </dl>
-          <p className="mt-8 text-xs leading-relaxed text-muted-foreground">
+
+          <div className="mt-6 rounded-xl border border-border bg-surface/50 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+              ₹14,500 Setup Advance (50%)
+            </span>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              Scan UPI or transfer to <span className="font-mono text-primary">vinayakmahavar95@okaxis</span> and submit your 12-digit UTR below.
+            </p>
+            {d.profile.payment_verified ? (
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
+                <Check className="size-3.5" /> Advance verified · Active
+              </div>
+            ) : (
+              <form
+                className="mt-3 space-y-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const utr = String(new FormData(e.currentTarget).get("utr") || "").trim();
+                  if (!utr) return;
+                  try {
+                    await api.submitPaymentUtr(utr);
+                    toast.success("UTR submitted. Operator will verify shortly.");
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Failed to submit.");
+                  }
+                }}
+              >
+                <Input
+                  name="utr"
+                  placeholder="Enter 12-digit UPI UTR"
+                  defaultValue={d.profile.payment_utr || ""}
+                  className="h-8 text-xs font-mono"
+                  required
+                />
+                <Button type="submit" size="sm" variant="outline" className="w-full h-8 text-xs">
+                  {d.profile.payment_utr ? "Update Submitted UTR" : "Submit UTR for Verification"}
+                </Button>
+              </form>
+            )}
+          </div>
+
+          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
             Plan and quota are managed by your operator and shown here as read-only.
           </p>
         </Panel>
