@@ -29,14 +29,26 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
     }
-    entityId = user.id;
+    let agencyId = user.id;
+    if (user.email) {
+      const { data: member } = await supabase
+        .from("team_members")
+        .select("agency_id")
+        .ilike("email", user.email.trim().toLowerCase())
+        .limit(1)
+        .maybeSingle();
+      if (member?.agency_id) {
+        agencyId = member.agency_id;
+      }
+    }
+    entityId = agencyId;
 
     const admin = createSupabaseAdminClient();
     if (admin) {
       const { data: mailbox } = await admin
         .from("workspace_mailboxes")
         .select("id, provider, sender_name, sender_email, smtp_host, status, created_at")
-        .eq("user_id", user.id)
+        .eq("user_id", entityId)
         .eq("status", "active")
         .maybeSingle();
 

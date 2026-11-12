@@ -33,7 +33,7 @@ export const demoProfiles: Profile[] = [
     contact_email: "ops@northline.agency",
     role: "client",
     target_niche: "B2B SaaS & fintech",
-    daily_lead_quota: 10,
+    daily_lead_quota: 5,
     slack_webhook_url: null,
     subscription_tier: "Starter",
     created_at: hoursAgo(24 * 61),

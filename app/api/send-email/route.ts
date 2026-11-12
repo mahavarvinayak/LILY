@@ -89,7 +89,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Email body is empty or too long." }, { status: 400 });
   }
 
-  const userId = user.id;
+  let agencyId = user.id;
+  if (user.email) {
+    const { data: member } = await supabase
+      .from("team_members")
+      .select("agency_id")
+      .ilike("email", user.email.trim().toLowerCase())
+      .limit(1)
+      .maybeSingle();
+    if (member?.agency_id) {
+      agencyId = member.agency_id;
+    }
+  }
+  const userId = agencyId;
 
   const { data: profile } = await supabase
     .from("profiles")

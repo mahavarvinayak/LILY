@@ -35,7 +35,19 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ ok: false, error: "Please sign in again." }, { status: 401 });
     }
-    entityId = user.id;
+    let agencyId = user.id;
+    if (user.email && supabase) {
+      const { data: member } = await supabase
+        .from("team_members")
+        .select("agency_id")
+        .ilike("email", user.email.trim().toLowerCase())
+        .limit(1)
+        .maybeSingle();
+      if (member?.agency_id) {
+        agencyId = member.agency_id;
+      }
+    }
+    entityId = agencyId;
   }
 
   const redirectUri = `${env.appUrl}/dashboard/connectors?composio_connected=true`;

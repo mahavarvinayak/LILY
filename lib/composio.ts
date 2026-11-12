@@ -104,13 +104,13 @@ export async function initiateMailboxOAuth(
 }
 
 export async function getConnectedMailboxes(entityId: string): Promise<ConnectedMailbox[]> {
-  if (!isComposioConfigured()) {
+  if (!isComposioConfigured() || !entityId) {
     return [];
   }
 
   try {
     const res = await fetch(
-      `https://backend.composio.dev/api/v3/connected_accounts?user_id=${encodeURIComponent(entityId)}`,
+      `https://backend.composio.dev/api/v3/connected_accounts?user_ids=${encodeURIComponent(entityId)}&user_id=${encodeURIComponent(entityId)}`,
       {
         headers: {
           "x-api-key": env.composioApiKey,
@@ -132,6 +132,10 @@ export async function getConnectedMailboxes(entityId: string): Promise<Connected
 
     return items
       .filter((item) => {
+        const itemUserId = item.user_id || (item as { userId?: string }).userId;
+        if (!itemUserId || itemUserId !== entityId) {
+          return false;
+        }
         const rawToolkit = typeof item.toolkit === "object" ? item.toolkit?.slug : item.toolkit;
         const name = (item.appName || rawToolkit || "").toLowerCase();
         return name.includes("gmail") || name.includes("outlook");

@@ -20,12 +20,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
     }
 
+    let agencyId = user.id;
+    if (user.email) {
+      const { data: member } = await supabase
+        .from("team_members")
+        .select("agency_id")
+        .ilike("email", user.email.trim().toLowerCase())
+        .limit(1)
+        .maybeSingle();
+      if (member?.agency_id) {
+        agencyId = member.agency_id;
+      }
+    }
+
     const { id } = (await request.json()) as { id?: string };
     if (!id) {
       return NextResponse.json({ ok: false, error: "Account ID is required." }, { status: 400 });
     }
 
-    const userMailboxes = await getConnectedMailboxes(user.id);
+    const userMailboxes = await getConnectedMailboxes(agencyId);
     const isOwner = userMailboxes.some((m) => m.id === id);
     if (!isOwner) {
       return NextResponse.json(
