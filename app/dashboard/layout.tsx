@@ -18,7 +18,6 @@ import {
   UserCheck,
   ShieldCheck,
   LayoutDashboard,
-  Sparkles,
   Plug,
   Settings,
   PanelLeft,
@@ -31,7 +30,6 @@ import { parseIcpConfig } from "@/lib/icp";
 import { LilyLogo } from "@/components/lily/lily-mark";
 import { LilyLoader } from "@/components/lily/lily-loader";
 import { ActivityCenter } from "@/components/app/activity-center";
-import { AgentBar } from "@/components/app/agent-bar";
 import { WorkspaceErrorBoundary } from "@/app/dashboard/workspace-error-boundary";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -57,7 +55,6 @@ const getNavGroups = (isAdmin: boolean) => [
   {
     label: "Command",
     items: [
-      { label: "LILY Chat", href: "/dashboard", icon: Sparkles },
       { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
       { label: "Opportunities", href: "/dashboard/opportunities", icon: Target },
       { label: "Outreach Studio", href: "/dashboard/outreach", icon: Send },
@@ -414,8 +411,6 @@ function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         </DialogContent>
       </Dialog>
-
-      <AgentBar />
     </div>
   );
 }
