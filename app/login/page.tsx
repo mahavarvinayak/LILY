@@ -18,13 +18,20 @@ function LoginFormInner() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  const emailParam = searchParams.get("email") ?? "";
 
   const [mode, setMode] = useState<"otp" | "signup">("otp");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailParam);
   const [agency, setAgency] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    }
+  }, [emailParam, email]);
 
   useEffect(() => {
     const supabase = createClient();

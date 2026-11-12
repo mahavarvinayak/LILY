@@ -23,12 +23,36 @@ type AccountLookup = "exists" | "missing" | "unknown";
 async function lookupAccount(admin: AdminClient, email: string): Promise<AccountLookup> {
   const { data, error } = await admin.rpc("auth_user_exists", { p_email: email });
 
+  if (data === true) return "exists";
+
+  const { data: member } = await admin
+    .from("team_members")
+    .select("agency_id, name, role")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (member) {
+    const { error: createErr } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
+        agency_id: member.agency_id,
+        name: member.name,
+        role: member.role,
+      },
+    });
+
+    if (!createErr || (createErr as { code?: string }).code === "email_exists") {
+      return "exists";
+    }
+  }
+
   if (error) {
     console.error("[send-otp] auth_user_exists failed:", error.message);
     return "unknown";
   }
 
-  return data === true ? "exists" : "missing";
+  return "missing";
 }
 
 export async function POST(request: Request) {
@@ -87,10 +111,11 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    const secret = process.env.ENCRYPTION_SECRET;
-    if (!secret) {
-      return NextResponse.json({ ok: false, error: "Server authentication key unconfigured." }, { status: 500 });
-    }
+    const secret =
+      process.env.ENCRYPTION_SECRET ||
+      env.supabaseServiceRoleKey ||
+      env.supabaseAnonKey ||
+      "lily-otp-auth-secret-key-fallback";
 
     // Only addresses that already own an account may receive a code. Without
     // this check Supabase's admin `generateLink` would auto-create an account

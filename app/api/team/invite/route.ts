@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { env, isResendConfigured } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/html";
 
 export const runtime = "nodejs";
@@ -58,6 +59,19 @@ export async function POST(request: Request) {
 
   if (insertError) {
     return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 });
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (admin) {
+    await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
+        agency_id: user.id,
+        name,
+        role,
+      },
+    });
   }
 
   let emailSent = false;

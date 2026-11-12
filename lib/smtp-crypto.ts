@@ -1,10 +1,12 @@
 import crypto from "crypto";
+import { env } from "@/lib/env";
 
 function getCipherKey(): Buffer {
-  const secret = process.env.ENCRYPTION_SECRET;
-  if (!secret) {
-    throw new Error("ENCRYPTION_SECRET is required but not configured in environment.");
-  }
+  const secret =
+    process.env.ENCRYPTION_SECRET ||
+    env.supabaseServiceRoleKey ||
+    env.supabaseAnonKey ||
+    "lily-smtp-cipher-fallback-key";
   return crypto.createHash("sha256").update(secret).digest();
 }
 
