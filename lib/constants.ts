@@ -4,6 +4,11 @@ export const ALLOWED_OPERATOR_EMAILS = [
   "mahavarvinayak@gmail.com",
 ] as const;
 
+export const OPERATOR_UPI_IDS = [
+  "vinayakmahavar45@okaxis",
+  "7069173080-e324@axl",
+] as const;
+
 /**
  * Single source of truth for plan pricing and delivery quotas. The landing
  * page, the request-access brief and the operator cockpit must not drift apart

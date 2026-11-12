@@ -1616,12 +1616,55 @@ export function SettingsPage() {
           </dl>
 
           <div className="mt-6 rounded-xl border border-border bg-surface/50 p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              ₹14,500 Setup Advance (50%)
-            </span>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Scan UPI or transfer to <span className="font-mono text-primary">vinayakmahavar95@okaxis</span> and submit your 12-digit UTR below.
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                50% Setup Advance (UPI / Bank)
+              </span>
+              <span className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary">
+                Instant UPI
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+              Transfer advance deposit via Google Pay, PhonePe, Paytm, or BHIM to either verified UPI ID and submit your 12-digit UTR below:
             </p>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-2.5">
+                <div className="min-w-0 pr-2">
+                  <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">UPI ID 1 (Axis / Google Pay)</span>
+                  <span className="font-mono text-xs font-medium text-primary select-all break-all">vinayakmahavar45@okaxis</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText("vinayakmahavar45@okaxis");
+                    toast.success("Copied vinayakmahavar45@okaxis");
+                  }}
+                  className="rounded p-1 text-muted-foreground hover:text-foreground shrink-0"
+                  title="Copy UPI ID"
+                >
+                  <Copy className="size-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-2.5">
+                <div className="min-w-0 pr-2">
+                  <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">UPI ID 2 (Axis / PhonePe)</span>
+                  <span className="font-mono text-xs font-medium text-primary select-all break-all">7069173080-e324@axl</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText("7069173080-e324@axl");
+                    toast.success("Copied 7069173080-e324@axl");
+                  }}
+                  className="rounded p-1 text-muted-foreground hover:text-foreground shrink-0"
+                  title="Copy UPI ID"
+                >
+                  <Copy className="size-3.5" />
+                </button>
+              </div>
+            </div>
             {d.profile.payment_verified ? (
               <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
                 <Check className="size-3.5" /> Advance verified · Active
