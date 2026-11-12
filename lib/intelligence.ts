@@ -64,23 +64,23 @@ export function synthesizeDefaultPitch(company: string, contactName: string, raw
   const isSalesOrBD = /\b(sales|business development|bde|bdr|sdr|client acquisition|marketing|lead gen)\b/i.test(cleanTrigger);
 
   if (isSalesOrBD) {
-    const emailSubject = `Quick note: ${company}'s outbound pipeline`;
-    const emailBody = `Hi ${firstName},\n\nSaw ${company} is currently hiring for business development to scale client acquisition.\n\nMost agency founders tell us that hiring and training new BDEs takes 6 to 8 weeks before seeing consistent qualified calls with US/EU prospects.\n\nWe install an automated pipeline engine that delivers verified, high-intent client opportunities directly into your CRM every morning—without the hiring lag.\n\nOpen to a brief 5-minute chat this Thursday to see 3 sample opportunities for ${company}?\n\nBest,`;
+    const emailSubject = `${company} · client acquisition pipeline`;
+    const emailBody = `Hi ${firstName},\n\nSaw ${company} is actively expanding client acquisition.\n\nInstead of waiting 60+ days for new BDEs to ramp up, we install an automated revenue engine that drops verified, trigger-matched US/EU decision makers straight into your pipeline every morning at 08:00 IST.\n\nWorth a 4-minute conversation this Thursday to see 3 sample accounts for ${company}?\n\nBest,`;
 
-    const linkedinNote = `Hi ${firstName}, saw ${company} is expanding its business development team. I work with agency founders to help scale client acquisition with US/EU accounts. Would love to connect and exchange notes!`;
+    const linkedinNote = `Hi ${firstName}, saw ${company} is expanding business development. We help agency founders solve client acquisition without the 8-week hiring delay. Let's connect!`;
 
-    const linkedinMessage = `Hey ${firstName}, saw you're actively scaling your business development team at ${company}.\n\nUsually, getting new BDEs ramped up on outbound takes 60+ days before seeing booked calls.\n\nWe help agency founders automate lead intelligence and deliver verified client opportunities directly to your desk from day 1.\n\nOpen to a brief 5-minute chat on Thursday to compare notes?`;
+    const linkedinMessage = `Hey ${firstName}, saw you're actively scaling client acquisition at ${company}.\n\nUsually, ramp-up takes 60+ days of manual scraping. We deliver verified US/EU opportunities directly to your desk from day 1.\n\nOpen to a quick 4-minute chat on Thursday to compare notes?`;
 
     return { emailSubject, emailBody, linkedinNote, linkedinMessage };
   }
 
   const shortTrigger = cleanTrigger.split(/\s+/).slice(0, 6).join(" ").replace(/[.,;:]$/, "");
-  const emailSubject = `Engineering bandwidth for ${company}'s roadmap`;
-  const emailBody = `Hi ${firstName},\n\nSaw ${company} is actively recruiting for ${cleanTrigger}.\n\nFinding vetted senior talent usually creates a 6-to-8 week recruitment lag that pushes critical product milestones back into next quarter.\n\nWe provide dedicated, pre-vetted senior talent ready to plug in and ship from Day 1—with zero recruitment overhead.\n\nWorth a quick 4-minute chat this Thursday to compare bandwidth?\n\nBest,`;
+  const emailSubject = `${company} · delivery bandwidth for ${shortTrigger}`;
+  const emailBody = `Hi ${firstName},\n\nNoticed ${company} is actively hiring for ${cleanTrigger}.\n\nWe help agency and engineering leaders eliminate the 6-to-8 week recruitment delay by deploying senior, pre-vetted specialists ready to ship within 72 hours.\n\nWorth a quick 4-minute chat this Thursday to compare bandwidth?\n\nBest,`;
 
-  const linkedinNote = `Hi ${firstName}, noticed ${company} is expanding its team for ${shortTrigger}. We help leaders hit delivery milestones without the 8-week hiring lag. Open to connecting?`;
+  const linkedinNote = `Hi ${firstName}, noticed ${company} is expanding for ${shortTrigger}. We help teams hit delivery milestones without the 8-week hiring delay. Open to connecting?`;
 
-  const linkedinMessage = `Hey ${firstName}, saw ${company} is actively recruiting for ${cleanTrigger}.\n\nMost founders tell us long hiring cycles stall sprint velocity and delay major release dates.\n\nWe plug in senior, pre-vetted talent within 72 hours so your roadmap stays on track.\n\nOpen to a quick 5-minute chat this Thursday to compare bandwidth?`;
+  const linkedinMessage = `Hey ${firstName}, saw ${company} is actively recruiting for ${cleanTrigger}.\n\nFinding vetted senior talent usually stalls sprint velocity. We plug in verified specialists within 72 hours so your roadmap stays on track.\n\nOpen to a quick 4-minute chat this Thursday?`;
 
   return { emailSubject, emailBody, linkedinNote, linkedinMessage };
 }

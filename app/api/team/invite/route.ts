@@ -5,7 +5,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml, headerText } from "@/lib/html";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { ALLOWED_OPERATOR_EMAILS } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,15 +58,6 @@ export async function POST(request: Request) {
   if (!name || !EMAIL_REGEX.test(email)) {
     return NextResponse.json(
       { ok: false, error: "Enter a valid name and email address." },
-      { status: 400 },
-    );
-  }
-
-  // An invited operator address would be auto-provisioned an account through
-  // this route; the operator allow-list is provisioned out of band instead.
-  if ((ALLOWED_OPERATOR_EMAILS as readonly string[]).includes(email)) {
-    return NextResponse.json(
-      { ok: false, error: "That address cannot be added as a team member." },
       { status: 400 },
     );
   }

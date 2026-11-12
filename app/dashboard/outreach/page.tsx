@@ -654,10 +654,10 @@ export default function OutreachStudioPage() {
                           </div>
                           <textarea
                             id="pitch-body"
-                            rows={7}
+                            rows={10}
                             value={customBody}
                             onChange={(e) => setCustomBody(e.target.value)}
-                            className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-primary focus:outline-none"
+                            className="w-full min-h-[220px] resize-y rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-relaxed text-foreground focus:border-primary focus:outline-none"
                           />
                         </div>
                       </div>
@@ -739,10 +739,10 @@ export default function OutreachStudioPage() {
                         </div>
                         <textarea
                           id="linkedin-note"
-                          rows={3}
+                          rows={4}
                           value={customLinkedinNote}
                           onChange={(e) => setCustomLinkedinNote(e.target.value)}
-                          className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-sky-500 focus:outline-none"
+                          className="w-full min-h-[90px] resize-y rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-relaxed text-foreground focus:border-sky-500 focus:outline-none"
                         />
                       </div>
 
@@ -766,10 +766,10 @@ export default function OutreachStudioPage() {
                         </div>
                         <textarea
                           id="linkedin-message"
-                          rows={6}
+                          rows={8}
                           value={customLinkedinMessage}
                           onChange={(e) => setCustomLinkedinMessage(e.target.value)}
-                          className="w-full rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-6 text-foreground focus:border-sky-500 focus:outline-none"
+                          className="w-full min-h-[170px] resize-y rounded-xl border border-border-strong bg-background p-3.5 text-sm leading-relaxed text-foreground focus:border-sky-500 focus:outline-none"
                         />
                       </div>
                     </div>
