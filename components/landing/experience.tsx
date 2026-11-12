@@ -99,7 +99,7 @@ export function ProductFrame() {
                 "Opportunities",
                 "Companies",
                 "People",
-                "LILY Assistant",
+                "Outreach Studio",
                 "Connectors",
               ].map((v, i) => (
                 <div

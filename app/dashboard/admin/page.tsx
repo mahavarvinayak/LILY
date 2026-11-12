@@ -215,9 +215,15 @@ export default function AdminCockpitPage() {
                       {formatDate(c.created_at)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
-                        {c.subscription_tier} · {c.daily_lead_quota}/day
-                      </span>
+                      {c.daily_lead_quota === 0 ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-rose-300">
+                          Paused · 0/day
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+                          {c.subscription_tier} · {c.daily_lead_quota}/day
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {c.payment_verified ? (
@@ -247,33 +253,40 @@ export default function AdminCockpitPage() {
                     </td>
                     <td className="py-3 pl-4 text-right">
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        {SUBSCRIPTION_TIER_NAMES.map((tier) => (
-                          <Button
-                            key={tier}
-                            size="sm"
-                            variant={tier === "Starter" ? "default" : "outline"}
-                            disabled={isBusy}
-                            onClick={() => void activateTier(c.id, tier)}
-                            className={
-                              tier === "Starter"
-                                ? "h-8 gap-1.5 bg-emerald-600 text-xs text-white hover:bg-emerald-500"
-                                : "h-8 text-xs"
-                            }
-                            title={`₹${SUBSCRIPTION_TIERS[tier].price.toLocaleString("en-IN")}/mo · ${SUBSCRIPTION_TIERS[tier].quota} leads/day`}
-                          >
-                            {tier === "Starter" && <Zap className="size-3" />}
-                            {tier} {SUBSCRIPTION_TIERS[tier].quota}/day
-                          </Button>
-                        ))}
+                        {SUBSCRIPTION_TIER_NAMES.map((tier) => {
+                          const isTierActive = c.subscription_tier === tier && c.daily_lead_quota > 0;
+                          return (
+                            <Button
+                              key={tier}
+                              size="sm"
+                              variant={isTierActive ? "default" : "outline"}
+                              disabled={isBusy}
+                              onClick={() => void activateTier(c.id, tier)}
+                              className={
+                                isTierActive
+                                  ? "h-8 gap-1.5 bg-emerald-600 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500"
+                                  : "h-8 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                              }
+                              title={`₹${SUBSCRIPTION_TIERS[tier].price.toLocaleString("en-IN")}/mo · ${SUBSCRIPTION_TIERS[tier].quota} leads/day`}
+                            >
+                              {isTierActive && <Zap className="size-3" />}
+                              {tier} {SUBSCRIPTION_TIERS[tier].quota}/day
+                            </Button>
+                          );
+                        })}
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant={c.daily_lead_quota === 0 ? "outline" : "ghost"}
                           disabled={isBusy || c.daily_lead_quota === 0}
                           onClick={() => void pauseClient(c.id)}
-                          className="h-8 gap-1 text-xs text-destructive hover:bg-destructive/10"
+                          className={
+                            c.daily_lead_quota === 0
+                              ? "h-8 gap-1 border-rose-500/40 bg-rose-500/10 text-xs font-semibold text-rose-300"
+                              : "h-8 gap-1 text-xs text-destructive hover:bg-destructive/10"
+                          }
                         >
                           <PauseCircle className="size-3" />
-                          Pause
+                          {c.daily_lead_quota === 0 ? "Paused" : "Pause"}
                         </Button>
                       </div>
                       {pendingUtr && (

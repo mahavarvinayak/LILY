@@ -637,7 +637,7 @@ export default function OutreachStudioPage() {
                         <div>
                           <div className="mb-1.5 flex items-center justify-between">
                             <Label htmlFor="pitch-body" className="text-xs font-semibold text-foreground">
-                              Personalized 3-sentence outreach body
+                              Personalized outreach pitch
                             </Label>
                             <button
                               type="button"

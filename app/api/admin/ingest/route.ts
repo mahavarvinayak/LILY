@@ -54,22 +54,35 @@ export async function GET() {
     );
   }
 
-  const { data: clients, error } = await admin
-    .from("profiles")
-    .select(
-      "id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier, payment_utr, payment_verified, payment_amount, created_at",
-    )
-    .eq("role", "client")
-    .order("created_at", { ascending: false });
+  const [{ data: clients, error }, { data: teamMembers }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select(
+        "id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier, payment_utr, payment_verified, payment_amount, created_at",
+      )
+      .eq("role", "client")
+      .order("created_at", { ascending: false }),
+    admin.from("team_members").select("email"),
+  ]);
 
   if (error) {
     return NextResponse.json({ authorized: false, error: error.message }, { status: 500 });
   }
 
+  const teamEmails = new Set(
+    (teamMembers || [])
+      .map((m) => (typeof m.email === "string" ? m.email.trim().toLowerCase() : ""))
+      .filter(Boolean),
+  );
+
+  const primaryClients = (clients || []).filter(
+    (c) => !c.contact_email || !teamEmails.has(c.contact_email.trim().toLowerCase()),
+  );
+
   return NextResponse.json({
     authorized: true,
     operator: user.email,
-    clients: clients || [],
+    clients: primaryClients,
   });
 }
 
@@ -102,6 +115,8 @@ function parseReleaseAt(value: unknown) {
 
 function leadOrDefault(lead: IngestedLead, releaseAt: string, draft?: { subject: string; body: string }) {
   const { first_name, last_name } = splitName(lead.contact_name);
+  const subject = lead.email_subject || lead.ai_subject_line || draft?.subject || null;
+  const body = lead.email_body || lead.ai_icebreaker || draft?.body || null;
   return {
     companyName: lead.company_name.trim(),
     website: lead.website?.trim() || null,
@@ -118,8 +133,10 @@ function leadOrDefault(lead: IngestedLead, releaseAt: string, draft?: { subject:
     dealName: lead.deal_name?.trim() || `${lead.company_name.trim()} — Growth Partnership`,
     dealValue: Number.isFinite(Number(lead.deal_value)) ? Number(lead.deal_value) : 0,
     notes: lead.notes?.trim() || null,
-    subject: draft?.subject ?? null,
-    body: draft?.body ?? null,
+    subject,
+    body,
+    linkedinNote: lead.linkedin_note?.trim() || null,
+    linkedinMessage: lead.linkedin_message?.trim() || null,
     releaseAt,
   };
 }
@@ -492,6 +509,8 @@ export async function POST(request: Request) {
         recent_founder_activity: String(rawLead.recent_activity || rawLead.recent_founder_activity || ""),
         ai_icebreaker: normalized.body || "",
         email_subject_line: normalized.subject || "",
+        linkedin_note: normalized.linkedinNote || "",
+        linkedin_message: normalized.linkedinMessage || "",
         verification_status: String(rawLead.verification_status || ""),
         source_attribution: normalized.triggerUrl || normalized.website || "",
       });

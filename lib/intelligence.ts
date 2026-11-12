@@ -64,23 +64,23 @@ export function synthesizeDefaultPitch(company: string, contactName: string, raw
   const isSalesOrBD = /\b(sales|business development|bde|bdr|sdr|client acquisition|marketing|lead gen)\b/i.test(cleanTrigger);
 
   if (isSalesOrBD) {
-    const emailSubject = `${company} · client acquisition pipeline`;
-    const emailBody = `Hi ${firstName},\n\nSaw ${company} is actively expanding client acquisition.\n\nInstead of waiting 60+ days for new BDEs to ramp up, we install an automated revenue engine that drops verified, trigger-matched US/EU decision makers straight into your pipeline every morning at 08:00 IST.\n\nWorth a 4-minute conversation this Thursday to see 3 sample accounts for ${company}?\n\nBest,`;
+    const emailSubject = `${company} · client acquisition pipeline & outbound bandwidth`;
+    const emailBody = `Hi ${firstName},\n\nNoticed ${company} is actively scaling client acquisition and business development.\n\nInstead of losing 60+ days sourcing, vetting, and ramping outbound SDRs who burn through commodity Apollo lists, we deploy a dedicated revenue infrastructure directly into your stack. Every morning at 08:00 IST, your team receives verified, trigger-matched decision makers actively hiring or raising in your target niche.\n\nOur client pods typically replace 2 full-time SDRs while cutting customer acquisition cost by 45% within the first 14 days.\n\nWould you be open to a brief 5-minute chat this Thursday to see 3 sample verified accounts currently in-market for ${company}?\n\nBest regards,`;
 
     const linkedinNote = `Hi ${firstName}, saw ${company} is expanding business development. We help agency founders solve client acquisition without the 8-week hiring delay. Let's connect!`;
 
-    const linkedinMessage = `Hey ${firstName}, saw you're actively scaling client acquisition at ${company}.\n\nUsually, ramp-up takes 60+ days of manual scraping. We deliver verified US/EU opportunities directly to your desk from day 1.\n\nOpen to a quick 4-minute chat on Thursday to compare notes?`;
+    const linkedinMessage = `Hey ${firstName}, saw you're actively scaling client acquisition at ${company}.\n\nUsually, ramp-up takes 60+ days of manual scraping and cold calling. We deliver verified US/EU opportunities directly to your desk from day 1.\n\nOpen to a quick 5-minute chat on Thursday to compare notes?`;
 
     return { emailSubject, emailBody, linkedinNote, linkedinMessage };
   }
 
   const shortTrigger = cleanTrigger.split(/\s+/).slice(0, 6).join(" ").replace(/[.,;:]$/, "");
-  const emailSubject = `${company} · delivery bandwidth for ${shortTrigger}`;
-  const emailBody = `Hi ${firstName},\n\nNoticed ${company} is actively hiring for ${cleanTrigger}.\n\nWe help agency and engineering leaders eliminate the 6-to-8 week recruitment delay by deploying senior, pre-vetted specialists ready to ship within 72 hours.\n\nWorth a quick 4-minute chat this Thursday to compare bandwidth?\n\nBest,`;
+  const emailSubject = `${company} · delivery bandwidth & engineering support for ${shortTrigger}`;
+  const emailBody = `Hi ${firstName},\n\nI noticed ${company} is actively recruiting for ${cleanTrigger}.\n\nScaling specialized delivery teams through conventional recruitment usually eats 6 to 8 weeks in screening cycles, delaying roadmap milestones and burning internal engineering bandwidth. We solve this bottleneck by deploying pre-vetted senior specialists and dedicated execution pods ready to commit code within 72 hours.\n\nWe operate on flexible, month-to-month delivery agreements with zero recruitment lock-in, giving you immediate velocity without permanent overhead.\n\nWould you be open to a quick 5-minute conversation this Thursday to explore whether our available bench matches ${company}'s immediate delivery requirements?\n\nBest regards,`;
 
   const linkedinNote = `Hi ${firstName}, noticed ${company} is expanding for ${shortTrigger}. We help teams hit delivery milestones without the 8-week hiring delay. Open to connecting?`;
 
-  const linkedinMessage = `Hey ${firstName}, saw ${company} is actively recruiting for ${cleanTrigger}.\n\nFinding vetted senior talent usually stalls sprint velocity. We plug in verified specialists within 72 hours so your roadmap stays on track.\n\nOpen to a quick 4-minute chat this Thursday?`;
+  const linkedinMessage = `Hey ${firstName}, saw ${company} is actively recruiting for ${cleanTrigger}.\n\nFinding vetted senior talent usually stalls sprint velocity. We plug in verified specialists within 72 hours so your roadmap stays on track.\n\nOpen to a quick 5-minute chat this Thursday?`;
 
   return { emailSubject, emailBody, linkedinNote, linkedinMessage };
 }
@@ -180,8 +180,15 @@ export function extractLeadIntelligence(
       /let us connect|open to connect/i.test(opp.ai_icebreaker),
   );
 
+  const isOldShortStub = Boolean(
+    opp.ai_icebreaker &&
+      /Worth a quick 4-minute chat this Thursday to compare bandwidth\?[\s\n]*Best,?$/i.test(
+        opp.ai_icebreaker.trim(),
+      ),
+  );
+
   const aiIcebreaker =
-    (!isOldShortDm && opp.ai_icebreaker) ||
+    (!isOldShortDm && !isOldShortStub && opp.ai_icebreaker) ||
     metaText(meta, "ai_icebreaker") ||
     defaultPitch.emailBody;
 

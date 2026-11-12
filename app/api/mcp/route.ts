@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { domainFromWebsite, splitName } from "@/lib/utils";
-import { serializeLeadIntelligence, type LeadIntelligence31 } from "@/lib/intelligence";
+import { serializeLeadIntelligence, synthesizeDefaultPitch, type LeadIntelligence31 } from "@/lib/intelligence";
 import { parseIcpConfig } from "@/lib/icp";
 import { ALLOWED_OPERATOR_EMAILS } from "@/lib/constants";
 
@@ -27,17 +27,27 @@ type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
  */
 async function isClientWorkspace(admin: AdminClient, clientId: string): Promise<boolean> {
   if (!admin || !clientId) return false;
-  const { data, error } = await admin
+  const { data: profile, error } = await admin
     .from("profiles")
-    .select("id")
+    .select("id, contact_email")
     .eq("id", clientId)
     .eq("role", "client")
     .maybeSingle();
-  if (error) {
-    console.error("[mcp] client lookup failed", error.message);
+  if (error || !profile) {
+    if (error) console.error("[mcp] client lookup failed", error.message);
     return false;
   }
-  return Boolean(data);
+
+  if (profile.contact_email) {
+    const { data: member } = await admin
+      .from("team_members")
+      .select("id")
+      .ilike("email", profile.contact_email.trim().toLowerCase())
+      .limit(1)
+      .maybeSingle();
+    if (member) return false;
+  }
+  return true;
 }
 
 async function verifyMcpAuth(
@@ -135,8 +145,30 @@ const MCP_TOOLS = [
         trigger_url: { type: "string" },
         intent_level: { type: "string" },
         required_engineering_stack: { type: "array", items: { type: "string" } },
-        ai_icebreaker: { type: "string" },
-        email_subject_line: { type: "string" },
+        email_body: {
+          type: "string",
+          description: "Full personalized cold email body / pitch for this lead.",
+        },
+        email_subject: {
+          type: "string",
+          description: "Targeted cold email subject line.",
+        },
+        ai_icebreaker: {
+          type: "string",
+          description: "Alias for email_body or initial hook.",
+        },
+        email_subject_line: {
+          type: "string",
+          description: "Alias for email_subject.",
+        },
+        linkedin_note: {
+          type: "string",
+          description: "Personalized LinkedIn connection request note (< 300 chars).",
+        },
+        linkedin_message: {
+          type: "string",
+          description: "Personalized LinkedIn direct outreach message.",
+        },
         verification_status: { type: "string" },
         source_attribution: { type: "string" },
         deal_value: { type: "number" },
@@ -242,11 +274,14 @@ export async function POST(request: Request) {
     const args = params?.arguments || {};
 
     if (toolName === "lily_list_client_workspaces") {
-      const { data: clients, error } = await admin
-        .from("profiles")
-        .select("id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier, created_at")
-        .eq("role", "client")
-        .order("created_at", { ascending: false });
+      const [{ data: clients, error }, { data: teamMembers }] = await Promise.all([
+        admin
+          .from("profiles")
+          .select("id, agency_name, contact_email, target_niche, daily_lead_quota, subscription_tier, created_at")
+          .eq("role", "client")
+          .order("created_at", { ascending: false }),
+        admin.from("team_members").select("email"),
+      ]);
 
       if (error) {
         return NextResponse.json({
@@ -256,7 +291,17 @@ export async function POST(request: Request) {
         });
       }
 
-      const formattedClients = (clients || []).map((c) => {
+      const teamEmails = new Set(
+        (teamMembers || [])
+          .map((m) => (typeof m.email === "string" ? m.email.trim().toLowerCase() : ""))
+          .filter(Boolean),
+      );
+
+      const primaryClients = (clients || []).filter(
+        (c) => !c.contact_email || !teamEmails.has(c.contact_email.trim().toLowerCase()),
+      );
+
+      const formattedClients = primaryClients.map((c) => {
         const icp = parseIcpConfig(c.target_niche);
         return {
           ...c,
@@ -483,6 +528,18 @@ export async function POST(request: Request) {
         }
       }
 
+      const defaultPitch = synthesizeDefaultPitch(companyName, contactName, buyingTrigger);
+      const emailSubject =
+        String(args.email_subject || args.email_subject_line || "").trim() ||
+        defaultPitch.emailSubject;
+      const emailBody =
+        String(args.email_body || args.ai_icebreaker || "").trim() ||
+        defaultPitch.emailBody;
+      const linkedinNote =
+        String(args.linkedin_note || "").trim() || defaultPitch.linkedinNote;
+      const linkedinMessage =
+        String(args.linkedin_message || "").trim() || defaultPitch.linkedinMessage;
+
       const intelPayload: LeadIntelligence31 = {
         company_name: companyName,
         website: website || "",
@@ -513,8 +570,10 @@ export async function POST(request: Request) {
           ? (args.required_engineering_stack as string[])
           : [],
         recent_founder_activity: String(args.recent_founder_activity || ""),
-        ai_icebreaker: String(args.ai_icebreaker || ""),
-        email_subject_line: String(args.email_subject_line || `Regarding ${companyName}`),
+        ai_icebreaker: emailBody,
+        email_subject_line: emailSubject,
+        linkedin_note: linkedinNote,
+        linkedin_message: linkedinMessage,
         verification_status: String(args.verification_status || ""),
         source_attribution: String(args.source_attribution || args.trigger_url || website || ""),
       };

@@ -133,6 +133,12 @@ export interface IngestedLead {
   deal_name?: string;
   deal_value?: number;
   notes?: string;
+  email_subject?: string;
+  email_body?: string;
+  ai_subject_line?: string;
+  ai_icebreaker?: string;
+  linkedin_note?: string;
+  linkedin_message?: string;
 }
 
 export interface AgentResult {

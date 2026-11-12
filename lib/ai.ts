@@ -156,7 +156,7 @@ async function callWithModelFallback(
 }
 
 const DRAFT_SYSTEM_PROMPT =
-  "You write high-converting B2B cold outreach for a boutique tech and revenue infrastructure agency. For each lead, return a specific subject line (max 7 words, no clickbait) and a 3-sentence email body (max 60 words). Sentence 1: hook referencing their exact hiring or expansion trigger without scraper tokens. Sentence 2: concrete value proposition (solving the 6-to-8 week hiring lag with instant vetted engineering or growth pods). Sentence 3: one low-friction ask (e.g. 'Worth a 4-minute chat this Thursday?'). No flattery, no 'hope you are well', no emojis, no bullet points, no invented facts. Write like a top-tier peer operator. Return strict JSON: {\"drafts\":[{\"id\":\"...\",\"subject\":\"...\",\"body\":\"...\"}]}";
+  "You write high-converting, substantial B2B cold outreach for a boutique tech and revenue infrastructure agency. For each lead, return a specific subject line (max 8 words, no clickbait) and a compelling 3 to 4 paragraph email body (120 to 180 words). Paragraph 1: personalized hook referencing their exact hiring or expansion trigger and company context. Paragraph 2: concrete value proposition detailing how our pre-vetted pods or automated pipeline solve the 6-to-8 week recruitment/ramp-up delay with immediate deployment. Paragraph 3: commercial credibility and risk-reversal (month-to-month, zero recruiting markup, instant velocity). Paragraph 4: one low-friction, respectful call-to-action (e.g. 'Worth a quick 5-minute conversation this Thursday to review available bandwidth?'). No flattery, no 'hope you are well', no emojis, no bullet points, no invented facts. Write like a senior peer operator. Return strict JSON: {\"drafts\":[{\"id\":\"...\",\"subject\":\"...\",\"body\":\"...\"}]}";
 
 /** Small batches keep the JSON response inside the token budget. */
 const DRAFT_CHUNK_SIZE = 8;
@@ -217,8 +217,8 @@ async function draftChunk(leads: DraftLead[]): Promise<Draft[]> {
     const record = draft as { id?: unknown; subject?: unknown; body?: unknown };
     if (typeof record.id !== "string") continue;
     byId.set(record.id, {
-      subject: String(record.subject ?? "").slice(0, 140).trim(),
-      body: String(record.body ?? "").slice(0, 900).trim(),
+      subject: String(record.subject ?? "").slice(0, 160).trim(),
+      body: String(record.body ?? "").slice(0, 2000).trim(),
     });
   }
 
